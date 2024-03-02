@@ -237,3 +237,80 @@ def Klein_simulation_FD(alpha, delta, T, price_grid):
         q2=tmp
         
     return p_table, profits, avg_profs1, avg_profs2#, avg_price
+
+
+
+
+def run_sim(runs, k, method='klein'):
+    
+    num_calcs=int(500000/1000-1)
+    summed_avg_profitabilities = np.zeros(num_calcs)
+
+    for n in range(0, runs):
+        p_table, avg_profs1, avg_profs2 = Klein_simulation(0.3, 0.95, 500000, k)
+        per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0)/2
+        summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
+
+    avg_avg_profitabilities = np.divide(summed_avg_profitabilities, runs)
+    return avg_avg_profitabilities
+
+def run_simFD(runs, k):
+    
+    num_calcs=int(500000/1000-1)
+    summed_avg_profitabilities = np.zeros(num_calcs)
+    A = np.zeros([0,500000])
+    B = np.zeros([0,500000])
+    C=np.zeros([0,249999])
+    D=np.zeros([0,249999])
+    counter = 0
+    avg_2period_prof1 = []
+    avg_2period_prof2 = []
+    cap=1
+    #for n in range(0, runs):
+    while cap<=177:
+        p_table,  profits, avg_profs1, avg_profs2 = Klein_simulation_FD(0.3, 0.95, 500000, k)
+        var1 = np.var(p_table[0, 398999:399999])
+        var2 = np.var(p_table[1, 398999:399999])
+        var = np.mean([var1, var2])
+        if var < 0.001:
+            per_firm_profit = avg_profs1 #np.sum([avg_profs1, avg_profs2], axis=0)/2
+            summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
+            A = np.vstack([A,p_table[0,:]])
+            B = np.vstack([B,p_table[1,:]])
+            counter += 1
+            avg_2period_prof1 = []
+            avg_2period_prof2 = []
+            prof1 = profits[0,:]
+            prof2 = profits[1,:]
+            for i in range(1,len(prof1)-1, 2):
+                avg_2period_prof1.append(prof1[i] + prof1[i+1])
+                avg_2period_prof2.append(prof2[i] + prof2[i+1])
+            #print(len(avg_2period_prof1))
+            C = np.vstack([C,avg_2period_prof1])
+            D = np.vstack([D,avg_2period_prof2])
+            cap+=1
+    #print(A)
+    #print("Shape of A: ", A.shape)
+    sum_avg_prices = np.sum([])
+    new = np.zeros([2, 500000])  # Initialize new list with zeros
+    for i in range(499998):
+        for j in range(counter):
+            new[0,i] += A[j, i]
+            new[1,i] += B[j, i]
+        new[0,i] /= counter  
+        new[1,i]/= counter
+    
+    
+    avg_profits=np.zeros([2,250000])
+
+    for i in range(249999):
+        for j in range(cap-1):
+            avg_profits[0,i] += C[j, i]
+            avg_profits[1,i] += D[j, i]
+        avg_profits[0,i] /= cap  
+        avg_profits[1,i]/= cap
+
+    avg_avg_profitabilities = np.divide(summed_avg_profitabilities, counter)
+    #print("Shape of new: ", new.shape)
+    #print(counter)
+    return new, avg_avg_profitabilities, avg_2period_prof1, avg_2period_prof2, avg_profits
