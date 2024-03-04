@@ -113,7 +113,6 @@ def Klein_simulation(alpha, delta, T, price_grid):
         avg_profs0: player 0 list of average profit for each 1000 period
         avg_profs1: player 1 list of average profit for each 1000 period
     """
-    #np.random.seed(3)
     # Initializing values
     epsilon = calculate_epsilon(T)
     i = 0
@@ -210,7 +209,6 @@ def Klein_simulation_FD(alpha, delta, T, price_grid):
              
         if t==400000:
             p_table[i,t] = price_grid[s_t_idx - 1]
-            #print(p_table[i,t])
         else:
             p_table[i, t] = select_price(j, t, p_table, q1, price_grid, epsilon[t])
         p_table[j, t] = p_table[j, t-1]
@@ -285,12 +283,10 @@ def run_simFD(runs, k):
             for i in range(1,len(prof1)-1, 2):
                 avg_2period_prof1.append(prof1[i] + prof1[i+1])
                 avg_2period_prof2.append(prof2[i] + prof2[i+1])
-            #print(len(avg_2period_prof1))
             C = np.vstack([C,avg_2period_prof1])
             D = np.vstack([D,avg_2period_prof2])
             cap+=1
-    #print(A)
-    #print("Shape of A: ", A.shape)
+
     sum_avg_prices = np.sum([])
     new = np.zeros([2, 500000])  # Initialize new list with zeros
     for i in range(499998):
@@ -311,6 +307,5 @@ def run_simFD(runs, k):
         avg_profits[1,i]/= cap
 
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, counter)
-    #print("Shape of new: ", new.shape)
-    #print(counter)
+
     return new, avg_avg_profitabilities, avg_2period_prof1, avg_2period_prof2, avg_profits
