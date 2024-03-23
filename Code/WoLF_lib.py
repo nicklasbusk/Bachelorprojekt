@@ -97,7 +97,7 @@ def q_func_wolf(q, alpha, gamma, p_table, price_grid, i, j,t):
         
     return q
 
-@njit
+#@njit
 def update_policy_WoLF(policy, price_grid, delta_l, delta_w, p_table, q, t, N, j, avg_policy, k):
     """
     args:
@@ -222,7 +222,7 @@ def WoLF_PHC(alpha, delta_l, delta_w, gamma, price_grid, T):
         avg_policy1,avg_policy2=avg_policy2,avg_policy1
         N1,N2=N2,N1
          
-    return avg_profs1, avg_profs2, p_table
+    return avg_profs1, avg_profs2, p_table, policy_1, policy_2
 
             
 
