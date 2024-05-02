@@ -87,7 +87,7 @@ def Klein_simulation(alpha, gamma, T, price_grid):
     t += 1 # now t = 2
 
     for t in range(t, T):
-        p_table[i,t] = p_table[i,t-1]
+        p_table[i,t] = p_table[i,t-1]# Det er ligemeget om det er -1 eller -2 da den sætter prisen 2 gange i træk
         p_idx = np.where(price_grid == p_table[i,t])[0][0]
         s_next = p_table[j,t-1]
         #s_next_idx = np.where(price_grid == s_next)[0][0]
@@ -191,7 +191,7 @@ def Klein_simulation_FD(alpha, gamma, T, price_grid):
 
 
 #@njit
-def run_sim(n, k):
+def run_sim_Q(n, k):
     """
     args:
         n: number of runs simulated
@@ -201,15 +201,22 @@ def run_sim(n, k):
     """
     num_calcs=int(500000/1000-1) # size of avg. profits 
     summed_avg_profitabilities = np.zeros(num_calcs)
+    summed_profit1 = np.zeros(num_calcs)
+    summed_profit2 = np.zeros(num_calcs)
 
     # simulating n runs of Klein_simulation
     for n in range(0, n):
         p_table, avg_profs1, avg_profs2 = Klein_simulation(0.3, 0.95, 500000, k)
         per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0)/2
         summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
+        summed_profit1=np.sum([summed_profit1,avg_profs1],axis=0)
+        summed_profit2=np.sum([summed_profit2,avg_profs2],axis=0)
 
+    res1=np.divide(summed_profit1, n)
+    res2=np.divide(summed_profit2, n)
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
-    return avg_avg_profitabilities
+    return avg_avg_profitabilities, res1, res2
+
 
 def run_simFD(n, k):
     """

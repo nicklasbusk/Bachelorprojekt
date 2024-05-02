@@ -18,7 +18,7 @@ def calculate_epsilon(T):
     epsilon_values = []
     
     for i in range(T):
-        theta = -((1/1000000) ** (1/T)) + 1 # theta being a decay paramter
+        theta = -((1/1000000) ** (1/T)) + 1 # theta being a decay parameter
         epsilon = (1 - theta) ** i 
         epsilon_values.append(epsilon)
     
