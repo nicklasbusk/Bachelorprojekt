@@ -53,7 +53,7 @@ def select_price(j, t, p_table, Q_table, price_grid, epsilon):
 
 # fra v2
 @njit
-def Klein_simulation(alpha, gamma, T, price_grid):
+def Q_learner(alpha, gamma, T, price_grid):
     """
     args:
         alpha: step-size parameter
