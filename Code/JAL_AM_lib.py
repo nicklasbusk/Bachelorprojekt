@@ -158,3 +158,26 @@ def JAL_AM(alpha, gamma, T, price_grid):
         N1,N2=N2,N1
         AV_1,AV_2=AV_2,AV_1
     return p_table, avg_profs1, avg_profs2
+
+
+def run_sim(n, k):
+    """
+    args:
+        n: number of runs simulated
+        k: length of price action vector
+    returns:
+        avg_avg_profitabilities: average of average profits over n simulations
+    """
+    num_calcs=int(500000/1000-1) # size of avg. profits 
+    summed_avg_profitabilities = np.zeros(num_calcs)
+    avg_prof_gain = np.zeros((n))
+    t=n
+    # simulating n runs of JAL-AM
+    for n in range(0, n):
+        p_table, avg_profs1, avg_profs2 = JAL_AM(0.3, 0.95, 500000, k)
+        per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0)/2
+        avg_prof_gain[n] = per_firm_profit[498]/0.125
+        summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
+
+    avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
+    return avg_avg_profitabilities, avg_prof_gain, t

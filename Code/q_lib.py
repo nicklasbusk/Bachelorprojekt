@@ -203,19 +203,20 @@ def run_sim_Q(n, k):
     summed_avg_profitabilities = np.zeros(num_calcs)
     summed_profit1 = np.zeros(num_calcs)
     summed_profit2 = np.zeros(num_calcs)
-
+    avg_prof_gain = np.zeros((n))
     # simulating n runs of Klein_simulation
     for n in range(0, n):
-        p_table, avg_profs1, avg_profs2 = Klein_simulation(0.3, 0.95, 500000, k)
+        p_table, avg_profs1, avg_profs2 = Q_learner(0.3, 0.95, 500000, k)
         per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0)/2
         summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
         summed_profit1=np.sum([summed_profit1,avg_profs1],axis=0)
         summed_profit2=np.sum([summed_profit2,avg_profs2],axis=0)
+        avg_prof_gain[n] = per_firm_profit[498]/0.125
 
     res1=np.divide(summed_profit1, n)
     res2=np.divide(summed_profit2, n)
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
-    return avg_avg_profitabilities, res1, res2
+    return avg_avg_profitabilities, res1, res2, avg_prof_gain
 
 
 def run_simFD(n, k):

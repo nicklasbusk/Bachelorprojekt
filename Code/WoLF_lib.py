@@ -194,15 +194,16 @@ def run_sim_wolf(n, k):
     """
     num_calcs=int(500000/1000-1) # size of avg. profits 
     summed_avg_profitabilities = np.zeros(num_calcs)
-
+    avg_prof_gain = np.zeros((n))   
     # simulating n runs of WoLF-PHC
     for n in range(0, n):
         avg_profs1, avg_profs2,_,_,_ = WoLF_PHC(0.3, 0.6, 0.2, 0.95, np.linspace(0,1,7), 500000)
         per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0)/2
+        avg_prof_gain[n] = per_firm_profit[498]/0.125
         summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
 
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
-    return avg_avg_profitabilities
+    return avg_avg_profitabilities, avg_prof_gain
 
 
 
