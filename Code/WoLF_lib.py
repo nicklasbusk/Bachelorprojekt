@@ -176,7 +176,7 @@ def WoLF_PHC(alpha, delta_l, delta_w, gamma, price_grid, T):
         avg_policy1,avg_policy2=avg_policy2,avg_policy1
         N1,N2=N2,N1
          
-    return avg_profs1, avg_profs2, p_table, policy_1, policy_2
+    return avg_profs1, avg_profs2, p_table
 
             
 
