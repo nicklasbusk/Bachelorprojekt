@@ -197,7 +197,7 @@ def run_sim_wolf(n, k):
     avg_prof_gain = np.zeros((n))   
     # simulating n runs of WoLF-PHC
     for n in range(0, n):
-        avg_profs1, avg_profs2,_,_,_ = WoLF_PHC(0.3, 0.6, 0.2, 0.95, np.linspace(0,1,7), 500000)
+        avg_profs1, avg_profs2,_, = WoLF_PHC(0.3, 0.6, 0.2, 0.95, np.linspace(0,1,7), 500000)
         per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0)/2
         avg_prof_gain[n] = per_firm_profit[498]/0.125
         summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
@@ -368,3 +368,157 @@ def run_sim_wolf_FD(n, k):
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, counter)
 
     return new, avg_avg_profitabilities, avg_2period_prof1, avg_2period_prof2, avg_profits
+
+
+
+@njit
+def select_price_WoLF_assymetric(epsilon, price_grid, current_state, policy,mu):
+    """
+    args:
+        epsilon: epsilon value to period t
+        price_grid: grid of prices
+        current_state: current state of player
+        policy: policy of player
+    returns:
+        either a random price or price determined by policy
+    """
+    
+    true_state=np.where(price_grid == current_state)[0][0] # current state (opponent's price)
+    if mu<=np.random.uniform(0,1):
+        s_t_idx=true_state 
+    else:
+        s_t_idx=np.where(price_grid==np.random.choice(price_grid))[0][0]
+    u = np.random.uniform(0,1)
+    if epsilon > u:
+        return np.random.choice(price_grid)
+    else:
+        cumsum = np.cumsum(policy[s_t_idx, :])
+        idx = np.searchsorted(cumsum, np.array([u]))[0]
+        return price_grid[idx]
+    
+
+
+
+@njit
+def WoLF_PHC_asymmetric(alpha, delta_l, delta_w, gamma, price_grid, T,mu):
+    """
+    args:
+        alpha: step-size parameter that regulates how quickly new information replaces old information
+        delta_l: learning rate when losing
+        delta_w: learning rate when winning
+        gamma: discount factor
+        price_grid: grid of prices
+        T: learning duration
+
+    returns:
+        avg_profs1: list of average profits of player 1
+        avg_profs2: list of average profits of player 2
+        p_table: 2xT array of prices
+    """
+    # Initializing values
+    epsilon = calculate_epsilon(T)
+    i = 0
+    j = 1
+    t = 0
+    # Initializing Q-functions
+    k = len(price_grid)
+    q1 = np.zeros((k, k)) 
+    q2 = np.zeros((k, k)) 
+    # Initializing policies
+    policy_1 = np.ones((k, k)) / k
+    policy_2 = np.ones((k, k)) / k
+    # Initializing average policies
+    avg_policy1 = np.ones((k, k)) / k
+    avg_policy2 = np.ones((k, k)) / k
+    # Initializing N, a counter
+    N1 = np.zeros(k)
+    N2 = np.zeros(k)
+    # Initializing profits
+    p_table = np.zeros((2,T))
+    profits = np.zeros((2,T))
+    avg_profs1 = []
+    avg_profs2 = []
+
+    # Setting random price and state for t = 0
+    p_table[i,t] = np.random.choice(price_grid)
+    p_table[j,t] = np.random.choice(price_grid)
+    
+    t += 1
+    # Setting random price and state for t = 1
+    p_table[i,t] = np.random.choice(price_grid)
+    p_table[j,t] = np.random.choice(price_grid)
+    t += 1
+    
+    for t in range(t, T-1):
+        if t%2!=0:
+            #update Q
+            q1=q_func_wolf(q1, alpha, gamma, p_table, price_grid, i, j, t)
+
+            #update N
+            current_state_idx = np.where(price_grid == p_table[j,t-2])[0][0]
+            N1[current_state_idx] += 1
+            
+            #update policy 
+            policy_1, N1, avg_policy1, q1 = update_policy_WoLF(policy_1, price_grid, delta_l, delta_w, p_table, q1, t, N1, j, avg_policy1, k)
+            
+            #update prices
+            p_table[i,t] = select_price_WoLF(epsilon[t], price_grid, p_table[j,t-1], policy_1)
+            p_table[j,t]= p_table[j,t-1]
+            
+            #update profits
+            profits[i, t] = profit(p_table[i,t], p_table[j,t])
+            profits[j, t] = profit(p_table[j,t], p_table[i,t])
+        else:
+            #update Q
+            q2=q_func_wolf(q2, alpha, gamma, p_table, price_grid, j, i, t)
+
+            #update N
+            current_state_idx = np.where(price_grid == p_table[i,t-2])[0][0]
+            N2[current_state_idx] += 1
+            
+            #update policy 
+            policy_2, N2, avg_policy2, q2 = update_policy_WoLF(policy_2, price_grid, delta_l, delta_w, p_table, q2, t, N2, i, avg_policy2, k)
+            
+            #update prices
+            p_table[j,t] = select_price_WoLF_assymetric(epsilon[t], price_grid, p_table[i,t-1], policy_2,mu)
+            p_table[i,t]= p_table[i,t-1]
+            
+            #update profits
+            profits[j, t] = profit(p_table[j,t], p_table[i,t])
+            profits[i, t] = profit(p_table[i,t], p_table[j,t])
+            
+        # Compute profits
+        if t % 1000 == 0:
+            profitability = np.sum(profits[i, (t-1000):t])/1000
+            avg_profs1.append(profitability)
+            profitability = np.sum(profits[j, (t-1000):t])/1000
+            avg_profs2.append(profitability)
+        
+        
+        #switching players and their variables
+        
+         
+    return avg_profs1, avg_profs2, p_table
+
+
+
+def run_sim_wolf_asym(n, k, mu):
+    """
+    args:
+        n: number of runs simulated
+        k: length of price action vector
+    returns:
+        avg_avg_profitabilities: average of average profits over n simulations
+    """
+    num_calcs=int(500000/1000-1) # size of avg. profits 
+    summed_avg_profitabilities = np.zeros(num_calcs)
+    avg_prof_gain = np.zeros((n))   
+    # simulating n runs of WoLF-PHC
+    for n in range(0, n):
+        avg_profs1, avg_profs2,_ = WoLF_PHC_asymmetric(0.3, 0.6, 0.2, 0.95, np.linspace(0,1,k), 500000,mu)
+        per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0)/2
+        avg_prof_gain[n] = per_firm_profit[498]/0.125
+        summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
+
+    avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
+    return avg_avg_profitabilities, avg_prof_gain
