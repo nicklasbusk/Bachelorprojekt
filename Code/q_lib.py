@@ -1,4 +1,20 @@
 from model_lib import *
+from tqdm.notebook import tqdm
+from tqdm import tqdm
+@njit
+def edge_or_focal(edge, focal, p_table):
+    avg = p_table[0, 499000:]
+    cycle = []
+    for i in range(0, len(avg), 2):
+        if avg[i] != avg[i - 2]:
+            cycle.append(True)
+        else:
+            cycle.append(False)
+    if False in cycle:
+        focal += 1
+    else:
+        edge += 1
+    return edge, focal
 
 #fra v2
 @njit
@@ -115,7 +131,9 @@ def Q_learner(alpha, gamma, T, price_grid):
         tmp=q1
         q1=q2
         q2=tmp
-        
+
+
+
     return p_table, avg_profs1, avg_profs2
 
 
@@ -204,19 +222,21 @@ def run_sim_Q(n, k):
     summed_profit1 = np.zeros(num_calcs)
     summed_profit2 = np.zeros(num_calcs)
     avg_prof_gain = np.zeros((n))
+    focal = 0
+    edge = 0
     # simulating n runs of Klein_simulation
-    for n in range(0, n):
+    for n in tqdm(range(n), desc='Q-learning', leave=True):
         p_table, avg_profs1, avg_profs2 = Q_learner(0.3, 0.95, 500000, k)
         per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0)/2
         summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
         summed_profit1=np.sum([summed_profit1,avg_profs1],axis=0)
         summed_profit2=np.sum([summed_profit2,avg_profs2],axis=0)
         avg_prof_gain[n] = per_firm_profit[498]/0.125
-
+        edge, focal = edge_or_focal(edge, focal, p_table)
     res1=np.divide(summed_profit1, n)
     res2=np.divide(summed_profit2, n)
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
-    return avg_avg_profitabilities, res1, res2, avg_prof_gain
+    return avg_avg_profitabilities, res1, res2, avg_prof_gain, edge, focal
 
 
 def run_simFD(n, k):
