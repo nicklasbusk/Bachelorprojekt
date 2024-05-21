@@ -12,9 +12,11 @@ def edge_or_focal(edge, focal, p_table):
             cycle.append(False)
     if False in cycle:
         focal += 1
+        is_focal = True
     else:
         edge += 1
-    return edge, focal
+        is_focal = False
+    return edge, focal, is_focal
 
 #fra v2
 @njit
@@ -216,6 +218,11 @@ def run_sim_Q(n, k):
         k: length of price action vector
     returns:
         avg_avg_profitabilities: average of average profits over n simulations
+        res1: summed profits of firm 1
+        res2: summed profits of firm 2
+        avg_prof_gain: list containing average profit gains of runs
+        edge: number of times simulations resulted in Edgeworth price cycle
+        focal: number of times simulations resulted in focal price
     """
     num_calcs=int(500000/1000-1) # size of avg. profits 
     summed_avg_profitabilities = np.zeros(num_calcs)
@@ -224,6 +231,7 @@ def run_sim_Q(n, k):
     avg_prof_gain = np.zeros((n))
     focal = 0
     edge = 0
+    p_mc = 0
     # simulating n runs of Klein_simulation
     for n in tqdm(range(n), desc='Q-learning', leave=True):
         p_table, avg_profs1, avg_profs2 = Q_learner(0.3, 0.95, 500000, k)
@@ -232,7 +240,7 @@ def run_sim_Q(n, k):
         summed_profit1=np.sum([summed_profit1,avg_profs1],axis=0)
         summed_profit2=np.sum([summed_profit2,avg_profs2],axis=0)
         avg_prof_gain[n] = per_firm_profit[498]/0.125
-        edge, focal = edge_or_focal(edge, focal, p_table)
+        edge, focal, p_mc = edge_or_focal(edge, focal, p_table)
     res1=np.divide(summed_profit1, n)
     res2=np.divide(summed_profit2, n)
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
