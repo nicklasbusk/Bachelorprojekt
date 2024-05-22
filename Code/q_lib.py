@@ -3,19 +3,30 @@ from tqdm.notebook import tqdm
 from tqdm import tqdm
 @njit
 def edge_or_focal(edge, focal, p_table):
-    avg = p_table[0, 499000:]
-    cycle = []
-    for i in range(0, len(avg), 2):
+    """
+    args
+        edge: counter for edgeworth cycles
+        focal: counter for focal pricing
+        p_table: price table from a simulation
+    returns
+        edge:counter for edgeworth cycles
+        focal: counter for focal pricing
+        is_focal: boolean, focal pricing or not
+    """
+    avg = p_table[0, -50:]
+    cycle = False
+    for i in range(2, len(avg)):
         if avg[i] != avg[i - 2]:
-            cycle.append(True)
-        else:
-            cycle.append(False)
-    if False in cycle:
-        focal += 1
-        is_focal = True
-    else:
+            cycle = True
+            break
+
+    if cycle:
         edge += 1
         is_focal = False
+    else:
+        focal += 1
+        is_focal = True
+
     return edge, focal, is_focal
 
 #fra v2
