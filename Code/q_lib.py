@@ -251,7 +251,7 @@ def run_sim_Q(n, k):
         summed_profit1=np.sum([summed_profit1,avg_profs1],axis=0)
         summed_profit2=np.sum([summed_profit2,avg_profs2],axis=0)
         avg_prof_gain[n] = per_firm_profit[498]/0.125
-        edge, focal, p_mc = edge_or_focal(edge, focal, p_table)
+        edge, focal, p_m = edge_or_focal(edge, focal, p_table)
     res1=np.divide(summed_profit1, n)
     res2=np.divide(summed_profit2, n)
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)

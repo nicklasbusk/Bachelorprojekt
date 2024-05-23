@@ -1,5 +1,35 @@
 import numpy as np
+from tqdm.notebook import tqdm
+from tqdm import tqdm
 from model_lib import *
+
+@njit
+def edge_or_focal(edge, focal, p_table):
+    """
+    args
+        edge: counter for edgeworth cycles
+        focal: counter for focal pricing
+        p_table: price table from a simulation
+    returns
+        edge:counter for edgeworth cycles
+        focal: counter for focal pricing
+        is_focal: boolean, focal pricing or not
+    """
+    avg = p_table[0, -50:]
+    cycle = False
+    for i in range(2, len(avg)):
+        if avg[i] != avg[i - 2]:
+            cycle = True
+            break
+
+    if cycle:
+        edge += 1
+        is_focal = False
+    else:
+        focal += 1
+        is_focal = True
+
+    return edge, focal, is_focal
 
 @njit
 def update_AV(AV, s, Q, pi_other, action_space):
@@ -54,8 +84,9 @@ def Q_func(p_curr_idx, s_curr_idx, i, j, t, alpha, gamma, p_table, Q_table, pric
     s_next_index = np.where(price_grid == s_next)[0][0]
     Max_AV_idx = np.argmax(AV[s_next_index, :])
     Max_AV = AV[s_next_index, Max_AV_idx]
-    reward = profit(p_table[i, t], p_table[j, t-2]) + gamma * profit(p_table[i, t], s_next) + gamma**2 * Max_AV
+    reward = profit(p_table[i, t], p_table[j, t-2]) + gamma * profit(p_table[i, t], s_next) + gamma * Max_AV
     return (1 - alpha) * prev_est + alpha * reward
+
 @njit
 def JAL_AM(alpha, gamma, T, price_grid):
     epsilon = calculate_epsilon(T)
@@ -272,20 +303,24 @@ def run_sim(n, k):
         k: length of price action vector
     returns:
         avg_avg_profitabilities: average of average profits over n simulations
+        avg_prof_gain: list containing average profit gains of runs
+        edge: number of times simulations resulted in Edgeworth price cycle
+        focal: number of times simulations resulted in focal price
     """
     num_calcs=int(500000/1000-1) # size of avg. profits 
     summed_avg_profitabilities = np.zeros(num_calcs)
     avg_prof_gain = np.zeros((n))
-    t=n
+    focal = 0
+    edge = 0
     # simulating n runs of JAL-AM
-    for n in range(0, n):
+    for i in tqdm(range(n), desc='JAL-AM', leave=True):
         p_table, avg_profs1, avg_profs2 = JAL_AM(0.3, 0.95, 500000, k)
         per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0)/2
-        avg_prof_gain[n] = per_firm_profit[498]/0.125
+        avg_prof_gain[i] = per_firm_profit[498]/0.125
         summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
-
+        edge, focal, p_m = edge_or_focal(edge, focal, p_table)
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
-    return avg_avg_profitabilities, avg_prof_gain, t
+    return avg_avg_profitabilities, avg_prof_gain, edge, focal
 
 
 

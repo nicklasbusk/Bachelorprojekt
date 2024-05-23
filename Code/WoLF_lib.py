@@ -1,5 +1,33 @@
 from model_lib import *
+from tqdm.notebook import tqdm
+from tqdm import tqdm
+@njit
+def edge_or_focal(edge, focal, p_table):
+    """
+    args
+        edge: counter for edgeworth cycles
+        focal: counter for focal pricing
+        p_table: price table from a simulation
+    returns
+        edge:counter for edgeworth cycles
+        focal: counter for focal pricing
+        is_focal: boolean, focal pricing or not
+    """
+    avg = p_table[0, -50:]
+    cycle = False
+    for i in range(2, len(avg)):
+        if avg[i] != avg[i - 2]:
+            cycle = True
+            break
 
+    if cycle:
+        edge += 1
+        is_focal = False
+    else:
+        focal += 1
+        is_focal = True
+
+    return edge, focal, is_focal
 
 
 @njit
@@ -141,7 +169,7 @@ def WoLF_PHC(alpha, delta_l, delta_w, gamma, price_grid, T):
     p_table[j,t] = np.random.choice(price_grid)
     t += 1
     
-    for t in range(t, T-1):
+    for t in range(t, T):
         
         #update Q
         q1=q_func_wolf(q1, alpha, gamma, p_table, price_grid, i, j, t)
@@ -180,10 +208,6 @@ def WoLF_PHC(alpha, delta_l, delta_w, gamma, price_grid, T):
 
             
 
-
-
-
-
 def run_sim_wolf(n, k):
     """
     args:
@@ -191,22 +215,25 @@ def run_sim_wolf(n, k):
         k: length of price action vector
     returns:
         avg_avg_profitabilities: average of average profits over n simulations
+        avg_prof_gain: list containing average profit gains of runs
+        edge: number of times simulations resulted in Edgeworth price cycle
+        focal: number of times simulations resulted in focal price
     """
     num_calcs=int(500000/1000-1) # size of avg. profits 
     summed_avg_profitabilities = np.zeros(num_calcs)
     avg_prof_gain = np.zeros((n))   
+    focal = 0
+    edge = 0
+    p_mc = 0
     # simulating n runs of WoLF-PHC
-    for n in range(0, n):
-        avg_profs1, avg_profs2,_, = WoLF_PHC(0.3, 0.6, 0.2, 0.95, np.linspace(0,1,7), 500000)
+    for i in tqdm(range(n), desc='WoLF-PHC', leave=True):
+        avg_profs1, avg_profs2, p_table = WoLF_PHC(0.3, 0.6, 0.2, 0.95, np.linspace(0,1,7), 500000)
         per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0)/2
-        avg_prof_gain[n] = per_firm_profit[498]/0.125
+        avg_prof_gain[i] = per_firm_profit[498]/0.125
         summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
-
-    avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
-    return avg_avg_profitabilities, avg_prof_gain
-
-
-
+        edge, focal, p_mc = edge_or_focal(edge, focal, p_table)
+    avg_avg_profitabilities = np.divide(summed_avg_profitabilities, i)
+    return avg_avg_profitabilities, avg_prof_gain, edge, focal
 
 
 
