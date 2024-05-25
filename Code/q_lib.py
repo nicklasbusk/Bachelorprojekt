@@ -80,7 +80,6 @@ def select_price(j, t, p_table, Q_table, price_grid, epsilon):
         return price_grid[maxedQ_idx]
 
 
-# fra v2
 @njit
 def Q_learner(alpha, gamma, T, price_grid):
     """
@@ -108,21 +107,21 @@ def Q_learner(alpha, gamma, T, price_grid):
     profits = np.zeros((2,T))
     avg_profs1 = []
     avg_profs2 = []
-    # Setting prices for players in first 2 periods 
+    # setting prices for players in first 2 periods 
     p_table[i, t] = np.random.choice(price_grid) # firm 1 sets price
     t += 1
     p_table[j, t] = np.random.choice(price_grid) # firm 2 sets price
-    p_table[i, t] = np.random.choice(price_grid) #p_table[i, t-1]
+    p_table[i, t] = np.random.choice(price_grid) 
     t += 1 # now t = 2
 
     for t in range(t, T):
-        p_table[i,t] = p_table[i,t-1]# Det er ligemeget om det er -1 eller -2 da den sætter prisen 2 gange i træk
+        # updating q-tables 
+        p_table[i,t] = p_table[i,t-1]
         p_idx = np.where(price_grid == p_table[i,t])[0][0]
         s_next = p_table[j,t-1]
-        #s_next_idx = np.where(price_grid == s_next)[0][0]
         current_state_idx = np.where(price_grid == p_table[j,t-2])[0][0]
         q1[p_idx, current_state_idx] = Q_func(p_idx, current_state_idx, i,j, t, alpha, gamma, p_table, q1, price_grid, s_next)
-
+        # setting price
         p_table[i, t] = select_price(j, t, p_table, q1, price_grid, epsilon[t])
         p_table[j, t] = p_table[j, t-1]
 
