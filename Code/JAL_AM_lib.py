@@ -106,7 +106,7 @@ def Q_func(p_curr_idx, s_curr_idx, i, j, t, alpha, gamma, p_table, Q_table, pric
     returns:
         updated value for Q_table 
     """
-    prev_est = Q_table[s_curr_idx, p_curr_idx, s_curr_idx]
+    prev_est = Q_table[s_curr_idx, p_curr_idx]
     s_next_index = np.where(price_grid == s_next)[0][0]
     Max_AV_idx = np.argmax(AV[s_next_index, :])
     Max_AV = AV[s_next_index, Max_AV_idx]
@@ -157,7 +157,7 @@ def JAL_AM(alpha, gamma, T, price_grid):
 
         N2, Agent_model_2 = update_agent_model(Agent_model_2, p_idx, current_state_idx, N2, k)
         AV_1 = update_AV(AV_1, current_state_idx, q1, Agent_model_2, price_grid)
-        q1[current_state_idx, p_idx, current_state_idx] = Q_func(p_idx, current_state_idx, i, j, t, alpha, gamma, p_table, q1, price_grid, s_next, AV_1)
+        q1[current_state_idx, p_idx] = Q_func(p_idx, current_state_idx, i, j, t, alpha, gamma, p_table, q1, price_grid, s_next, AV_1)
         # setting price
         s_next_idx = np.where(price_grid == p_table[j, t-1])[0][0]
         p_table[i, t] = select_price(s_next_idx, price_grid, epsilon[t], AV_1)
