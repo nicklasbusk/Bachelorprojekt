@@ -396,10 +396,31 @@ def run_sim_wolf_FD(n, k):
 
     return new, avg_avg_profitabilities, avg_2period_prof1, avg_2period_prof2, avg_profits
 
-
+# ASYMMETRIC INFORMATION
 
 @njit
-def select_price_WoLF_assymetric(epsilon, price_grid, current_state, policy,mu):
+def edge_or_focal_asym(edge, focal, p_table, mu, periods):
+    tolerance = mu * periods
+    avg = p_table[0, -periods:]
+    cycle = False
+    deviations = 0
+
+    for i in range(2, len(avg)):
+        if avg[i] != avg[i-2]:
+            deviations += 1
+            if deviations > tolerance:
+                cycle = True
+                break
+    if cycle:
+        edge += 1
+        is_focal = False
+    else:
+        focal += 1
+        is_focal = True
+    return edge, focal, is_focal
+
+@njit
+def select_price_WoLF_asym(epsilon, price_grid, current_state, policy,mu):
     """
     args:
         epsilon: epsilon value to period t
@@ -427,7 +448,7 @@ def select_price_WoLF_assymetric(epsilon, price_grid, current_state, policy,mu):
 
 
 @njit
-def WoLF_PHC_asymmetric(alpha, delta_l, delta_w, gamma, price_grid, T,mu):
+def WoLF_PHC_asym(alpha, delta_l, delta_w, gamma, price_grid, T, mu):
     """
     args:
         alpha: step-size parameter that regulates how quickly new information replaces old information
@@ -436,7 +457,7 @@ def WoLF_PHC_asymmetric(alpha, delta_l, delta_w, gamma, price_grid, T,mu):
         gamma: discount factor
         price_grid: grid of prices
         T: learning duration
-
+        mu: probability of observing wrong price
     returns:
         avg_profs1: list of average profits of player 1
         avg_profs2: list of average profits of player 2
@@ -507,7 +528,7 @@ def WoLF_PHC_asymmetric(alpha, delta_l, delta_w, gamma, price_grid, T,mu):
             policy_2, N2, avg_policy2, q2 = update_policy_WoLF(policy_2, price_grid, delta_l, delta_w, p_table, q2, t, N2, i, avg_policy2, k)
             
             #update prices
-            p_table[j,t] = select_price_WoLF_assymetric(epsilon[t], price_grid, p_table[i,t-1], policy_2,mu)
+            p_table[j,t] = select_price_WoLF_asym(epsilon[t], price_grid, p_table[i,t-1], policy_2,mu)
             p_table[i,t]= p_table[i,t-1]
             
             #update profits
@@ -520,11 +541,8 @@ def WoLF_PHC_asymmetric(alpha, delta_l, delta_w, gamma, price_grid, T,mu):
             avg_profs1.append(profitability)
             profitability = np.sum(profits[j, (t-1000):t])/1000
             avg_profs2.append(profitability)
-        
-        
+
         #switching players and their variables
-        
-         
     return avg_profs1, avg_profs2, p_table
 
 
@@ -539,13 +557,15 @@ def run_sim_wolf_asym(n, k, mu):
     """
     num_calcs=int(500000/1000-1) # size of avg. profits 
     summed_avg_profitabilities = np.zeros(num_calcs)
-    avg_prof_gain = np.zeros((n))   
+    avg_prof_gain = np.zeros((n))
+    edge = 0
+    focal = 0
     # simulating n runs of WoLF-PHC
-    for n in range(0, n):
-        avg_profs1, avg_profs2,_ = WoLF_PHC_asymmetric(0.3, 0.6, 0.2, 0.95, np.linspace(0,1,k), 500000,mu)
+    for i in range(0, n):
+        avg_profs1, avg_profs2, p_table = WoLF_PHC_asym(0.3, 0.6, 0.2, 0.95, k, 500000, mu)
         per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0)/2
-        avg_prof_gain[n] = per_firm_profit[498]/0.125
+        avg_prof_gain[i] = per_firm_profit[498]/0.125
         summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
-
+        edge, focal, p_m = edge_or_focal_asym(edge, focal, p_table, mu, 50)
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
-    return avg_avg_profitabilities, avg_prof_gain
+    return avg_avg_profitabilities, avg_prof_gain, edge, focal

@@ -143,11 +143,209 @@ def Q_learner(alpha, gamma, T, price_grid):
         tmp=q1
         q1=q2
         q2=tmp
-
-
-
     return p_table, avg_profs1, avg_profs2
 
+#@njit
+def run_sim_Q(n, k):
+    """
+    args:
+        n: number of runs simulated
+        k: length of price action vector
+    returns:
+        avg_avg_profitabilities: average of average profits over n simulations
+        res1: summed profits of firm 1
+        res2: summed profits of firm 2
+        avg_prof_gain: list containing average profit gains of runs
+        edge: number of times simulations resulted in Edgeworth price cycle
+        focal: number of times simulations resulted in focal price
+    """
+    num_calcs=int(500000/1000-1) # size of avg. profits 
+    summed_avg_profitabilities = np.zeros(num_calcs)
+    summed_profit1 = np.zeros(num_calcs)
+    summed_profit2 = np.zeros(num_calcs)
+    avg_prof_gain = np.zeros((n))
+    focal = 0
+    edge = 0
+    p_mc = 0
+    # simulating n runs of Klein_simulation
+    for i in range(n):
+        p_table, avg_profs1, avg_profs2 = Q_learner(0.3, 0.95, 500000, k)
+        per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0)/2
+        summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
+        summed_profit1=np.sum([summed_profit1,avg_profs1],axis=0)
+        summed_profit2=np.sum([summed_profit2,avg_profs2],axis=0)
+        avg_prof_gain[i] = per_firm_profit[498]/0.125
+        edge, focal, p_m = edge_or_focal(edge, focal, p_table)
+    res1=np.divide(summed_profit1, n)
+    res2=np.divide(summed_profit2, n)
+    avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
+    return avg_avg_profitabilities, res1, res2, avg_prof_gain, edge, focal
+
+# ASYMETRIC INFORMATION
+@njit
+def edge_or_focal_asym(edge, focal, p_table, mu, periods):
+    tolerance = mu * periods
+    avg = p_table[0, -periods:]
+    cycle = False
+    deviations = 0
+
+    for i in range(2, len(avg)):
+        if avg[i] != avg[i-2]:
+            deviations += 1
+            if deviations > tolerance:
+                cycle = True
+                break
+    if cycle:
+        edge += 1
+        is_focal = False
+    else:
+        focal += 1
+        is_focal = True
+    return edge, focal, is_focal
+
+@njit
+def select_price_asym(j, t, p_table, Q_table, price_grid, epsilon, mu):
+    """
+    args:
+        j: player 1
+        t: current period
+        p_table: 2x500.000 array storing prices for player 0 and 1
+        Q_table: current Q_table
+        price_grid: price_grid
+        epsilon: decay parameter of learning module
+    returns:
+        random price or maximized price
+    """
+    
+    true_state=np.where(price_grid == p_table[j, t-1])[0][0] # current state (opponent's price)
+    if mu<=np.random.uniform(0,1):
+        s_t_idx=true_state 
+    else:
+        s_t_idx=np.where(price_grid==np.random.choice(price_grid))[0][0]
+    
+    # Exploration
+    if epsilon >= np.random.uniform(0,1):
+        return np.random.choice(price_grid)
+    else:
+    # Exploitation
+        maxedQ_idx = np.argmax(Q_table[:, s_t_idx])
+        return price_grid[maxedQ_idx]
+
+@njit
+def Q_asym(alpha, gamma, T, price_grid, mu):
+    """
+    args:
+        alpha: step-size parameter
+        gamma: discount factor
+        T: learning duration
+        price_grid: price_grid
+    returns:
+        p_table: 2x500.000 array, with all prices set by player 0 and 1
+        avg_profs0: player 0 list of average profit for each 1000 period
+        avg_profs1: player 1 list of average profit for each 1000 period
+    """
+    # Initializing values
+    epsilon = calculate_epsilon(T)
+    #i = 0
+    #j = 1
+    t = 0
+    # Initializing Q-functions
+    p = len(price_grid)
+    q1 = np.zeros((p, p)) 
+    q2 = np.zeros((p, p)) 
+
+    p_table = np.zeros((2,T))
+    profits = np.zeros((2,T))
+    avg_profs1 = []
+    avg_profs2 = []
+    # Setting prices for players in first 2 periods 
+    p_table[0, t] = np.random.choice(price_grid) # firm 1 sets price
+    t += 1
+    p_table[1, t] = np.random.choice(price_grid) # firm 2 sets price
+    p_table[0, t] = np.random.choice(price_grid) #p_table[i, t-1]
+    t += 1 # now t = 2
+    liste=[]
+    y=10
+    for t in range(t, T):
+        if t%2!=0:
+            p_table[0,t] = p_table[0,t-1]# Det er ligemeget om det er -1 eller -2 da den sætter prisen 2 gange i træk
+            p_idx = np.where(price_grid == p_table[0,t])[0][0]
+            s_next = p_table[1,t-1]
+            #s_next_idx = np.where(price_grid == s_next)[0][0]
+            current_state_idx = np.where(price_grid == p_table[1,t-2])[0][0]
+            q1[p_idx, current_state_idx] = Q_func(p_idx, current_state_idx, 0,1, t, alpha, gamma, p_table, q1, price_grid, s_next)
+
+            p_table[0, t] = select_price(1, t, p_table, q1, price_grid, epsilon[t])
+            p_table[1, t] = p_table[1, t-1]
+
+            # Store profits for both firms
+            profits[0, t] = profit(p_table[0,t], p_table[1,t])
+            profits[1, t] = profit(p_table[1,t], p_table[0,t])
+        else:
+            p_table[1,t] = p_table[1,t-1]# Det er ligemeget om det er -1 eller -2 da den sætter prisen 2 gange i træk
+            p_idx = np.where(price_grid == p_table[1,t])[0][0]
+            s_next = p_table[0,t-1]
+            #s_next_idx = np.where(price_grid == s_next)[0][0]
+            current_state_idx = np.where(price_grid == p_table[0,t-2])[0][0]
+            q1[p_idx, current_state_idx] = Q_func(p_idx, current_state_idx, 1,0, t, alpha, gamma, p_table, q1, price_grid, s_next)
+            
+            #questionable state for select price asym
+            p_table[1, t] = select_price_asym(0, t, p_table, q1, price_grid, epsilon[t], mu)
+            p_table[0, t] = p_table[0, t-1]
+
+            # Store profits for both firms
+            profits[1, t] = profit(p_table[1,t], p_table[0,t])
+            profits[0, t] = profit(p_table[0,t], p_table[1,t])
+            if t>=240000:
+                liste.append(q1)
+
+
+        # compute avg profitability of last 1000 runs for both firms
+        if t % 1000 == 0:
+            profitability = np.sum(profits[0, (t-1000):t])/1000
+            avg_profs1.append(profitability)
+            profitability = np.sum(profits[1, (t-1000):t])/1000
+            avg_profs2.append(profitability)
+            
+        # changing agents
+        #tmp = i
+        #i = j
+        #j = tmp
+        tmp=q1
+        q1=q2
+        q2=tmp        
+    return p_table, avg_profs1, avg_profs2
+
+def run_sim_Q_Asym(n, k, mu):
+    """
+    args:
+        n: number of runs simulated
+        k: length of price action vector
+        mu: probability of observing wrong price
+    returns:
+        avg_avg_profitabilities: average of average profits over n simulations
+        res1: summed average profits of firm 1
+        res2: summed average profits of firm 2
+        edge: number of times simulations resulted in Edgeworth price cycles
+        focal: number of times simulations resulted in focal price
+        p_mc: outcomes of focal pricing ending i price 1 increment above MC
+    """
+    num_calcs=int(500000/1000-1) # size of avg. profits 
+    summed_avg_profitabilities = np.zeros(num_calcs)
+    avg_prof_gain = np.zeros((n))
+    summed_profit1 = np.zeros(num_calcs)
+    summed_profit2 = np.zeros(num_calcs)
+    focal = 0
+    edge = 0
+    # simulating n runs of Klein_simulation
+    for i in range(n):
+        p_table, avg_profs1, avg_profs2 = Q_asym(0.3, 0.95, 500000, k, mu)
+        per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0)/2
+        summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
+        avg_prof_gain[i] = per_firm_profit[498]/0.125
+        edge, focal, is_focal = edge_or_focal_asym(edge, focal, p_table, mu, 50)
+    avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
+    return avg_avg_profitabilities, avg_prof_gain, edge, focal
 
 # fra v2
 @njit
@@ -217,45 +415,6 @@ def Klein_simulation_FD(alpha, gamma, T, price_grid):
         q2=tmp
         
     return p_table, profits, avg_profs1, avg_profs2
-
-
-
-#@njit
-def run_sim_Q(n, k):
-    """
-    args:
-        n: number of runs simulated
-        k: length of price action vector
-    returns:
-        avg_avg_profitabilities: average of average profits over n simulations
-        res1: summed profits of firm 1
-        res2: summed profits of firm 2
-        avg_prof_gain: list containing average profit gains of runs
-        edge: number of times simulations resulted in Edgeworth price cycle
-        focal: number of times simulations resulted in focal price
-    """
-    num_calcs=int(500000/1000-1) # size of avg. profits 
-    summed_avg_profitabilities = np.zeros(num_calcs)
-    summed_profit1 = np.zeros(num_calcs)
-    summed_profit2 = np.zeros(num_calcs)
-    avg_prof_gain = np.zeros((n))
-    focal = 0
-    edge = 0
-    p_mc = 0
-    # simulating n runs of Klein_simulation
-    for n in tqdm(range(n), desc='Q-learning', leave=True):
-        p_table, avg_profs1, avg_profs2 = Q_learner(0.3, 0.95, 500000, k)
-        per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0)/2
-        summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
-        summed_profit1=np.sum([summed_profit1,avg_profs1],axis=0)
-        summed_profit2=np.sum([summed_profit2,avg_profs2],axis=0)
-        avg_prof_gain[n] = per_firm_profit[498]/0.125
-        edge, focal, p_m = edge_or_focal(edge, focal, p_table)
-    res1=np.divide(summed_profit1, n)
-    res2=np.divide(summed_profit2, n)
-    avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
-    return avg_avg_profitabilities, res1, res2, avg_prof_gain, edge, focal
-
 
 def run_simFD(n, k):
     """

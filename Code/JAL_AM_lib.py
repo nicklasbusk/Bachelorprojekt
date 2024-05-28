@@ -208,6 +208,29 @@ def run_sim(n, k):
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
     return avg_avg_profitabilities, avg_prof_gain, edge, focal
 
+
+# ASYMMETRIC INFORMATION
+@njit
+def edge_or_focal_asym(edge, focal, p_table, mu, periods):
+    tolerance = mu * periods
+    avg = p_table[0, -periods:]
+    cycle = False
+    deviations = 0
+
+    for i in range(2, len(avg)):
+        if avg[i] != avg[i-2]:
+            deviations += 1
+            if deviations > tolerance:
+                cycle = True
+                break
+    if cycle:
+        edge += 1
+        is_focal = False
+    else:
+        focal += 1
+        is_focal = True
+    return edge, focal, is_focal
+
 @njit
 def select_price_asym(true_state, price_grid, epsilon, AV, mu,Q):
     """
@@ -304,7 +327,7 @@ def JAL_AM_asym(alpha, gamma, T, price_grid, mu):
     return p_table, avg_profs1, avg_profs2
 
 
-def run_sim_asym(n, k, mu):
+def run_sim_JAL_AM_asym(n, k, mu):
     """
     args:
         n: number of runs simulated
@@ -325,8 +348,9 @@ def run_sim_asym(n, k, mu):
     summed_profit2=np.zeros(num_calcs)
     summed_avg_profitabilities = np.zeros(num_calcs)
     avg_prof_gain = np.zeros((n))
-    t = n
-    
+    focal = 0
+    edge = 0
+
     # simulating n runs of JAL-AM
     for i in range(n):
         p_table, avg_profs1, avg_profs2 = JAL_AM_asym(0.3, 0.95, 500000, k, mu)
@@ -335,7 +359,6 @@ def run_sim_asym(n, k, mu):
         summed_profit1=np.sum([summed_profit1,avg_profs1],axis=0)
         summed_profit2=np.sum([summed_profit2,avg_profs2],axis=0)
         summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
-    res1=np.divide(summed_profit1, n)
-    res2=np.divide(summed_profit2, n)
+        edge, focal, p_m = edge_or_focal_asym(edge, focal, p_table, mu, 50)
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
-    return avg_avg_profitabilities, avg_prof_gain, t, res1, res2
+    return avg_avg_profitabilities, avg_prof_gain, edge, focal
