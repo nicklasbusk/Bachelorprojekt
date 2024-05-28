@@ -69,7 +69,7 @@ def update_agent_model(agent_model, state, action, counter,k):
     return counter, agent_model
 
 @njit
-def select_price(s_t_idx, price_grid, epsilon, AV):
+def select_price(s_t_idx, price_grid, epsilon, AV,Q):
     """
     args
         s_t_idx: current state index
@@ -79,6 +79,7 @@ def select_price(s_t_idx, price_grid, epsilon, AV):
     returns
         random price in learning module or optimal price in action module
     """
+   
     # exploration
     if epsilon >= np.random.uniform(0, 1):
         return np.random.choice(price_grid)
@@ -160,7 +161,7 @@ def JAL_AM(alpha, gamma, T, price_grid):
         q1[current_state_idx, p_idx] = Q_func(p_idx, current_state_idx, i, j, t, alpha, gamma, p_table, q1, price_grid, s_next, AV_1)
         # setting price
         s_next_idx = np.where(price_grid == p_table[j, t-1])[0][0]
-        p_table[i, t] = select_price(s_next_idx, price_grid, epsilon[t], AV_1)
+        p_table[i, t] = select_price(s_next_idx, price_grid, epsilon[t], AV_1,q1)
         p_table[j, t] = p_table[j, t-1]
         # store profits for both firms
         profits[i, t] = profit(p_table[i, t], p_table[j, t])
@@ -207,9 +208,8 @@ def run_sim(n, k):
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
     return avg_avg_profitabilities, avg_prof_gain, edge, focal
 
-
 @njit
-def select_price_asym(true_state, price_grid, epsilon, AV, mu):
+def select_price_asym(true_state, price_grid, epsilon, AV, mu,Q):
     """
     args
         true_state: true price set by competitor
@@ -272,10 +272,10 @@ def JAL_AM_asym(alpha, gamma, T, price_grid, mu):
             
             N2, Agent_model_2 = update_agent_model(Agent_model_2, p_idx, current_state_idx, N2, k)
             AV_1 = update_AV(AV_1, current_state_idx, q1, Agent_model_2, price_grid)
-            q1[current_state_idx, p_idx] = Q_func(p_idx, current_state_idx, i, j, t, alpha, gamma, p_table, q1, price_grid, s_next, Agent_model_2, T, AV_1)
+            q1[current_state_idx, p_idx] = Q_func(p_idx, current_state_idx, i, j, t, alpha, gamma, p_table, q1, price_grid, s_next, AV_1) # Agent_model_2, T
             
             s_next_idx = np.where(price_grid == p_table[j, t-1])[0][0]
-            p_table[i, t] = select_price_asym(s_next_idx, price_grid, epsilon[t], AV_1, mu)
+            p_table[i, t] = select_price(s_next_idx, price_grid, epsilon[t], AV_1,q1)
             p_table[j, t] = p_table[j, t-1]
             
             profits[i, t] = profit(p_table[i, t], p_table[j, t])
@@ -288,10 +288,10 @@ def JAL_AM_asym(alpha, gamma, T, price_grid, mu):
             
             N1, Agent_model_1 = update_agent_model(Agent_model_1, p_idx, current_state_idx, N1, k)
             AV_2 = update_AV(AV_2, current_state_idx, q2, Agent_model_1, price_grid)
-            q2[current_state_idx, p_idx] = Q_func(p_idx, current_state_idx, j, i, t, alpha, gamma, p_table, q2, price_grid, s_next, Agent_model_1, T, AV_2)
+            q2[current_state_idx, p_idx] = Q_func(p_idx, current_state_idx, j, i, t, alpha, gamma, p_table, q2, price_grid, s_next, AV_2) #Agent_model_1, T
             
             s_next_idx = np.where(price_grid == p_table[i, t-1])[0][0]
-            p_table[j, t] = select_price_asym(s_next_idx, price_grid, epsilon[t], AV_2, mu)
+            p_table[j, t] = select_price_asym(s_next_idx, price_grid, epsilon[t], AV_2, mu,q2)
             p_table[i, t] = p_table[i, t-1]
             
             profits[i, t] = profit(p_table[i, t], p_table[j, t])
