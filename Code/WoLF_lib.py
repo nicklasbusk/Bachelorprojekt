@@ -1,6 +1,7 @@
 from model_lib import *
 from tqdm.notebook import tqdm
 from tqdm import tqdm
+from concurrent.futures import ProcessPoolExecutor, as_completed
 @njit
 def edge_or_focal(edge, focal, p_table):
     """
@@ -206,7 +207,11 @@ def WoLF_PHC(alpha, delta_l, delta_w, gamma, price_grid, T):
          
     return avg_profs1, avg_profs2, p_table
 
-            
+
+def run_sim_wolf_single_run(alpha, delta_win, delta_loss, gamma, price_grid, T):
+    avg_profs1, avg_profs2, p_table = WoLF_PHC(alpha, delta_win, delta_loss, gamma, price_grid, T)
+    per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0) / 2
+    return avg_profs1, avg_profs2, p_table, per_firm_profit
 
 def run_sim_wolf(n, k):
     """
@@ -219,20 +224,22 @@ def run_sim_wolf(n, k):
         edge: number of times simulations resulted in Edgeworth price cycle
         focal: number of times simulations resulted in focal price
     """
-    num_calcs=int(500000/1000-1) # size of avg. profits 
+    num_calcs = int(500000 / 1000 - 1)  # size of avg. profits 
     summed_avg_profitabilities = np.zeros(num_calcs)
-    avg_prof_gain = np.zeros((n))   
+    avg_prof_gain = np.zeros(n)
     focal = 0
     edge = 0
     p_mc = 0
-    # simulating n runs of WoLF-PHC
-    for i in tqdm(range(n), desc='WoLF-PHC', leave=True):
-        avg_profs1, avg_profs2, p_table = WoLF_PHC(0.3, 0.6, 0.2, 0.95, np.linspace(0,1,7), 500000)
-        per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0)/2
-        avg_prof_gain[i] = per_firm_profit[498]/0.125
-        summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
-        edge, focal, p_mc = edge_or_focal(edge, focal, p_table)
-    avg_avg_profitabilities = np.divide(summed_avg_profitabilities, i)
+
+    with ProcessPoolExecutor() as executor:
+        futures = [executor.submit(run_sim_wolf_single_run, 0.3, 0.6, 0.2, 0.95,k, 500000) for _ in range(n)]
+        for i, future in enumerate(as_completed(futures)):
+            avg_profs1, avg_profs2, p_table, per_firm_profit = future.result()
+            avg_prof_gain[i] = per_firm_profit[498] / 0.125
+            summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
+            edge, focal, p_mc = edge_or_focal(edge, focal, p_table)
+            
+    avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
     return avg_avg_profitabilities, avg_prof_gain, edge, focal
 
 
@@ -326,8 +333,6 @@ def WoLF_PHC_FD(alpha, delta_l, delta_w, gamma, price_grid, T):
         N1,N2=N2,N1
          
     return profits, avg_profs1, avg_profs2, p_table
-
-
 
 
 def run_sim_wolf_FD(n, k):
@@ -445,8 +450,6 @@ def select_price_WoLF_asym(epsilon, price_grid, current_state, policy,mu):
         return price_grid[idx]
     
 
-
-
 @njit
 def WoLF_PHC_asym(alpha, delta_l, delta_w, gamma, price_grid, T, mu):
     """
@@ -546,26 +549,37 @@ def WoLF_PHC_asym(alpha, delta_l, delta_w, gamma, price_grid, T, mu):
     return avg_profs1, avg_profs2, p_table
 
 
+def run_sim_wolf_asym_single_run(alpha, delta_win, delta_loss, gamma, price_grid, T, mu):
+    avg_profs1, avg_profs2, p_table = WoLF_PHC_asym(alpha, delta_win, delta_loss, gamma, price_grid, T, mu)
+    per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0) / 2
+    return avg_profs1, avg_profs2, p_table, per_firm_profit
 
-def run_sim_wolf_asym(n, k, mu):
+def run_sim_wolf_asym(n, k,mu):
     """
     args:
         n: number of runs simulated
         k: length of price action vector
     returns:
         avg_avg_profitabilities: average of average profits over n simulations
+        avg_prof_gain: list containing average profit gains of runs
+        edge: number of times simulations resulted in Edgeworth price cycle
+        focal: number of times simulations resulted in focal price
     """
-    num_calcs=int(500000/1000-1) # size of avg. profits 
+    num_calcs = int(500000 / 1000 - 1)  # size of avg. profits 
     summed_avg_profitabilities = np.zeros(num_calcs)
-    avg_prof_gain = np.zeros((n))
-    edge = 0
+    avg_prof_gain = np.zeros(n)
     focal = 0
-    # simulating n runs of WoLF-PHC
-    for i in range(0, n):
-        avg_profs1, avg_profs2, p_table = WoLF_PHC_asym(0.3, 0.6, 0.2, 0.95, k, 500000, mu)
-        per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0)/2
-        avg_prof_gain[i] = per_firm_profit[498]/0.125
-        summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
-        edge, focal, p_m = edge_or_focal_asym(edge, focal, p_table, mu, 50)
+    edge = 0
+    p_mc = 0
+
+    with ProcessPoolExecutor() as executor:
+        futures = [executor.submit(run_sim_wolf_asym_single_run, 0.3, 0.6, 0.2, 0.95,k, 500000,mu) for _ in range(n)]
+        for i, future in enumerate(as_completed(futures)):
+            avg_profs1, avg_profs2, p_table, per_firm_profit = future.result()
+            avg_prof_gain[i] = per_firm_profit[498] / 0.125
+            summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
+            edge, focal, p_mc = edge_or_focal_asym(edge, focal, p_table,mu,50)
+            
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
     return avg_avg_profitabilities, avg_prof_gain, edge, focal
+

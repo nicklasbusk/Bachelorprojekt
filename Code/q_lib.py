@@ -1,6 +1,7 @@
 from model_lib import *
 from tqdm.notebook import tqdm
 from tqdm import tqdm
+from concurrent.futures import ProcessPoolExecutor, as_completed
 @njit
 def edge_or_focal(edge, focal, p_table):
     """
@@ -145,9 +146,38 @@ def Q_learner(alpha, gamma, T, price_grid):
         q2=tmp
     return p_table, avg_profs1, avg_profs2
 
-#@njit
+
+def run_sim_Q_single_run(alpha, gamma, T, price_grid):
+    p_table, avg_profs1, avg_profs2 = Q_learner(alpha, gamma, T, price_grid)
+    per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0) / 2
+    return p_table, avg_profs1, avg_profs2, per_firm_profit
+
+def run_sim_Q(n, k):
+    num_calcs = int(500000 / 1000 - 1)
+    summed_avg_profitabilities = np.zeros(num_calcs)
+    summed_profit1 = np.zeros(num_calcs)
+    summed_profit2 = np.zeros(num_calcs)
+    avg_prof_gain = np.zeros((n))
+    focal = 0
+    edge = 0
+
+    with ProcessPoolExecutor() as executor:
+        futures = [executor.submit(run_sim_Q_single_run, 0.3, 0.95, 500000, k) for _ in range(n)]
+        for i, future in enumerate(as_completed(futures)):
+            p_table, avg_profs1, avg_profs2, per_firm_profit = future.result()
+            summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
+            summed_profit1 = np.sum([summed_profit1, avg_profs1], axis=0)
+            summed_profit2 = np.sum([summed_profit2, avg_profs2], axis=0)
+            avg_prof_gain[i] = per_firm_profit[498] / 0.125
+            edge, focal, p_m = edge_or_focal(edge, focal, p_table)
+            
+    avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
+    return avg_avg_profitabilities, avg_prof_gain, edge, focal
+
+"""
 def run_sim_Q(n, k):
     """
+"""
     args:
         n: number of runs simulated
         k: length of price action vector
@@ -159,6 +189,7 @@ def run_sim_Q(n, k):
         edge: number of times simulations resulted in Edgeworth price cycle
         focal: number of times simulations resulted in focal price
     """
+"""
     num_calcs=int(500000/1000-1) # size of avg. profits 
     summed_avg_profitabilities = np.zeros(num_calcs)
     summed_profit1 = np.zeros(num_calcs)
@@ -176,11 +207,9 @@ def run_sim_Q(n, k):
         summed_profit2=np.sum([summed_profit2,avg_profs2],axis=0)
         avg_prof_gain[i] = per_firm_profit[498]/0.125
         edge, focal, p_m = edge_or_focal(edge, focal, p_table)
-    res1=np.divide(summed_profit1, n)
-    res2=np.divide(summed_profit2, n)
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
-    return avg_avg_profitabilities, res1, res2, avg_prof_gain, edge, focal
-
+    return avg_avg_profitabilities, avg_prof_gain, edge, focal
+"""
 # ASYMETRIC INFORMATION
 @njit
 def edge_or_focal_asym(edge, focal, p_table, mu, periods):
@@ -316,7 +345,12 @@ def Q_asym(alpha, gamma, T, price_grid, mu):
         q2=tmp        
     return p_table, avg_profs1, avg_profs2
 
-def run_sim_Q_Asym(n, k, mu):
+def run_sim_Q_asym_single_run(alpha, gamma, T, price_grid, mu):
+    p_table, avg_profs1, avg_profs2 = Q_asym(alpha, gamma, T, price_grid, mu)
+    per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0) / 2
+    return p_table, avg_profs1, avg_profs2, per_firm_profit
+
+def run_sim_Q_Asym(n, k,mu):
     """
     args:
         n: number of runs simulated
@@ -328,24 +362,28 @@ def run_sim_Q_Asym(n, k, mu):
         res2: summed average profits of firm 2
         edge: number of times simulations resulted in Edgeworth price cycles
         focal: number of times simulations resulted in focal price
-        p_mc: outcomes of focal pricing ending i price 1 increment above MC
     """
-    num_calcs=int(500000/1000-1) # size of avg. profits 
+    num_calcs = int(500000 / 1000 - 1)
     summed_avg_profitabilities = np.zeros(num_calcs)
-    avg_prof_gain = np.zeros((n))
     summed_profit1 = np.zeros(num_calcs)
     summed_profit2 = np.zeros(num_calcs)
+    avg_prof_gain = np.zeros((n))
     focal = 0
     edge = 0
-    # simulating n runs of Klein_simulation
-    for i in range(n):
-        p_table, avg_profs1, avg_profs2 = Q_asym(0.3, 0.95, 500000, k, mu)
-        per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0)/2
-        summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
-        avg_prof_gain[i] = per_firm_profit[498]/0.125
-        edge, focal, is_focal = edge_or_focal_asym(edge, focal, p_table, mu, 50)
+
+    with ProcessPoolExecutor() as executor:
+        futures = [executor.submit(run_sim_Q_asym_single_run, 0.3, 0.95, 500000, k,mu) for _ in range(n)]
+        for i, future in enumerate(as_completed(futures)):
+            p_table, avg_profs1, avg_profs2, per_firm_profit = future.result()
+            summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
+            summed_profit1 = np.sum([summed_profit1, avg_profs1], axis=0)
+            summed_profit2 = np.sum([summed_profit2, avg_profs2], axis=0)
+            avg_prof_gain[i] = per_firm_profit[498] / 0.125
+            edge, focal, p_m = edge_or_focal_asym(edge, focal, p_table,mu,50)
+            
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
     return avg_avg_profitabilities, avg_prof_gain, edge, focal
+
 
 # fra v2
 @njit
