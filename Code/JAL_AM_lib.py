@@ -185,7 +185,7 @@ def run_sim_JALAM_single_run(alpha, gamma, T, price_grid):
     per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0) / 2
     return p_table, avg_profs1, avg_profs2, per_firm_profit
 
-def run_sim_JAL_AM(n, k):
+def run_sim_JAL_AM(n, k, show_progress=False):
     """
     args:
         n: number of runs simulated
@@ -206,7 +206,12 @@ def run_sim_JAL_AM(n, k):
 
     with ProcessPoolExecutor() as executor:
         futures = [executor.submit(run_sim_JALAM_single_run, 0.3, 0.95, 500000, k) for _ in range(n)]
-        for i, future in enumerate(as_completed(futures)):
+        if show_progress:
+            iterator = tqdm(enumerate(as_completed(futures)), total=n)
+        else:
+            iterator = enumerate(as_completed(futures))
+        
+        for i, future in iterator:
             p_table, avg_profs1, avg_profs2, per_firm_profit = future.result()
             summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
             summed_profit1 = np.sum([summed_profit1, avg_profs1], axis=0)
@@ -376,7 +381,7 @@ def run_sim_JALAM_asym_single_run(alpha, gamma, T, price_grid,mu):
     per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0) / 2
     return p_table, avg_profs1, avg_profs2, per_firm_profit
 
-def run_sim_JAL_AM_asym(n, k, mu):
+def run_sim_JAL_AM_asym(n, k, mu,show_progress=False):
     """
     args:
         n: number of runs simulated
@@ -399,7 +404,12 @@ def run_sim_JAL_AM_asym(n, k, mu):
 
     with ProcessPoolExecutor() as executor:
         futures = [executor.submit(run_sim_JALAM_asym_single_run, 0.3, 0.95, 500000, k,mu) for _ in range(n)]
-        for i, future in enumerate(as_completed(futures)):
+        if show_progress:
+            iterator = tqdm(enumerate(as_completed(futures)), total=n)
+        else:
+            iterator = enumerate(as_completed(futures))
+        
+        for i, future in iterator:
             p_table, avg_profs1, avg_profs2, per_firm_profit = future.result()
             summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
             summed_profit1 = np.sum([summed_profit1, avg_profs1], axis=0)
