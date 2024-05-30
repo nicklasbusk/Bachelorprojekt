@@ -166,7 +166,7 @@ def run_sim_Q(n, k, show_progress=False):
         
         # Select the appropriate iterator based on the show_progress flag
         if show_progress:
-            iterator = tqdm(enumerate(as_completed(futures)), total=n)
+            iterator = tqdm(enumerate(as_completed(futures)), total=n, desc='Q-learning')
         else:
             iterator = enumerate(as_completed(futures))
         
@@ -180,42 +180,7 @@ def run_sim_Q(n, k, show_progress=False):
             
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
     return avg_avg_profitabilities, avg_prof_gain, edge, focal
-"""
-def run_sim_Q(n, k):
-    """
-"""
-    args:
-        n: number of runs simulated
-        k: length of price action vector
-    returns:
-        avg_avg_profitabilities: average of average profits over n simulations
-        res1: summed profits of firm 1
-        res2: summed profits of firm 2
-        avg_prof_gain: list containing average profit gains of runs
-        edge: number of times simulations resulted in Edgeworth price cycle
-        focal: number of times simulations resulted in focal price
-    """
-"""
-    num_calcs=int(500000/1000-1) # size of avg. profits 
-    summed_avg_profitabilities = np.zeros(num_calcs)
-    summed_profit1 = np.zeros(num_calcs)
-    summed_profit2 = np.zeros(num_calcs)
-    avg_prof_gain = np.zeros((n))
-    focal = 0
-    edge = 0
-    p_mc = 0
-    # simulating n runs of Klein_simulation
-    for i in range(n):
-        p_table, avg_profs1, avg_profs2 = Q_learner(0.3, 0.95, 500000, k)
-        per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0)/2
-        summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
-        summed_profit1=np.sum([summed_profit1,avg_profs1],axis=0)
-        summed_profit2=np.sum([summed_profit2,avg_profs2],axis=0)
-        avg_prof_gain[i] = per_firm_profit[498]/0.125
-        edge, focal, p_m = edge_or_focal(edge, focal, p_table)
-    avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
-    return avg_avg_profitabilities, avg_prof_gain, edge, focal
-"""
+
 # ASYMETRIC INFORMATION
 @njit
 def edge_or_focal_asym(edge, focal, p_table, mu, periods):
@@ -381,7 +346,7 @@ def run_sim_Q_Asym(n, k,mu, show_progress=False):
         
         futures = [executor.submit(run_sim_Q_asym_single_run, 0.3, 0.95, 500000, k,mu) for _ in range(n)]
         if show_progress:
-            iterator = tqdm(enumerate(as_completed(futures)), total=n)
+            iterator = tqdm(enumerate(as_completed(futures)), total=n, desc='Q-learning asym')
         else:
             iterator = enumerate(as_completed(futures))
         

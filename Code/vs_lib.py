@@ -1,6 +1,6 @@
 from model_lib import *
 from WoLF_lib import *
-from q_learning_lib import *
+from q_lib import *
 
 @njit
 def WoLF_PHC_vs_q_learning(alpha, delta_l, delta_w, gamma, price_grid, T):

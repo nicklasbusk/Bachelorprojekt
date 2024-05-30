@@ -207,7 +207,7 @@ def run_sim_JAL_AM(n, k, show_progress=False):
     with ProcessPoolExecutor() as executor:
         futures = [executor.submit(run_sim_JALAM_single_run, 0.3, 0.95, 500000, k) for _ in range(n)]
         if show_progress:
-            iterator = tqdm(enumerate(as_completed(futures)), total=n)
+            iterator = tqdm(enumerate(as_completed(futures)), total=n, desc='JAL-AM')
         else:
             iterator = enumerate(as_completed(futures))
         
@@ -225,7 +225,7 @@ def run_sim_JAL_AM(n, k, show_progress=False):
 # ASYMMETRIC INFORMATION
 @njit
 def edge_or_focal_asym(edge, focal, p_table, mu, periods):
-    tolerance = mu * periods * 1.5
+    tolerance = mu * periods * 3
     avg = p_table[0, -periods:]
     cycle = False
     deviations = 0
@@ -340,41 +340,6 @@ def JAL_AM_asym(alpha, gamma, T, price_grid, mu):
     return p_table, avg_profs1, avg_profs2
 
 
-def run_sim_JAL_AM_asym(n, k, mu):
-    """
-    args:
-        n: number of runs simulated
-        k: length of price action vector
-        mu: probability of observing true state
-    returns:
-        avg_avg_profitabilities: average of average profits over n simulations
-        avg_prof_gain: list containing average profit gains of runs
-        t: nuumber of simulations
-        edge: number of times simulations resulted in Edgeworth price cycle
-        focal: number of times simulations resulted in focal price
-    """
-    
-    num_calcs = int(500000 / 1000 - 1)  # size of avg. profits 
-    summed_profit1=np.zeros(num_calcs)
-    summed_profit2=np.zeros(num_calcs)
-    summed_avg_profitabilities = np.zeros(num_calcs)
-    avg_prof_gain = np.zeros((n))
-    focal = 0
-    edge = 0
-
-    # simulating n runs of JAL-AM
-    for i in range(n):
-        p_table, avg_profs1, avg_profs2 = JAL_AM_asym(0.3, 0.95, 500000, k, mu)
-        per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0) / 2
-        avg_prof_gain[i] = per_firm_profit[-1] / 0.125  # Adjust index to access the last element correctly
-        summed_profit1=np.sum([summed_profit1,avg_profs1],axis=0)
-        summed_profit2=np.sum([summed_profit2,avg_profs2],axis=0)
-        summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
-        edge, focal, p_m = edge_or_focal_asym(edge, focal, p_table, mu, 50)
-    avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
-    return avg_avg_profitabilities, avg_prof_gain, edge, focal
-
-
 
 def run_sim_JALAM_asym_single_run(alpha, gamma, T, price_grid,mu):
     p_table, avg_profs1, avg_profs2 = JAL_AM_asym(alpha, gamma, T, price_grid,mu)
@@ -405,7 +370,7 @@ def run_sim_JAL_AM_asym(n, k, mu,show_progress=False):
     with ProcessPoolExecutor() as executor:
         futures = [executor.submit(run_sim_JALAM_asym_single_run, 0.3, 0.95, 500000, k,mu) for _ in range(n)]
         if show_progress:
-            iterator = tqdm(enumerate(as_completed(futures)), total=n)
+            iterator = tqdm(enumerate(as_completed(futures)), total=n, desc='JAL-AM asym')
         else:
             iterator = enumerate(as_completed(futures))
         

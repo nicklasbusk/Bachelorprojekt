@@ -234,7 +234,7 @@ def run_sim_wolf(n, k, show_progress=False):
     with ProcessPoolExecutor() as executor:
         futures = [executor.submit(run_sim_wolf_single_run, 0.3, 0.6, 0.2, 0.95,k, 500000) for _ in range(n)]
         if show_progress:
-            iterator = tqdm(enumerate(as_completed(futures)), total=n)
+            iterator = tqdm(enumerate(as_completed(futures)), total=n, desc='WoLF-PHC')
         else:
             iterator = enumerate(as_completed(futures))
         
@@ -430,7 +430,7 @@ def edge_or_focal_asym(edge, focal, p_table, mu, periods):
     return edge, focal, is_focal
 
 @njit
-def select_price_WoLF_asym(epsilon, price_grid, current_state, policy,mu):
+def select_price_WoLF_asym(epsilon, price_grid, current_state, policy, mu):
     """
     args:
         epsilon: epsilon value to period t
@@ -580,7 +580,7 @@ def run_sim_wolf_asym(n, k,mu, show_progress=False):
     with ProcessPoolExecutor() as executor:
         futures = [executor.submit(run_sim_wolf_asym_single_run, 0.3, 0.6, 0.2, 0.95,k, 500000,mu) for _ in range(n)]
         if show_progress:
-            iterator = tqdm(enumerate(as_completed(futures)), total=n)
+            iterator = tqdm(enumerate(as_completed(futures)), total=n, desc='WoLF-PHC asym')
         else:
             iterator = enumerate(as_completed(futures))
         
