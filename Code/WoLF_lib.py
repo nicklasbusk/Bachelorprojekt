@@ -593,3 +593,224 @@ def run_sim_wolf_asym(n, k,mu, show_progress=False):
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
     return avg_avg_profitabilities, avg_prof_gain, edge, focal
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+###################CONVERGENCE##############################
+
+
+
+
+@njit
+def WoLF_PHC_convergence(alpha, delta_l, delta_w, gamma, price_grid, T):
+    """
+    args:
+        alpha: step-size parameter that regulates how quickly new information replaces old information
+        delta_l: learning rate when losing
+        delta_w: learning rate when winning
+        gamma: discount factor
+        price_grid: grid of prices
+        T: learning duration
+
+    returns:
+        avg_profs1: list of average profits of player 1
+        avg_profs2: list of average profits of player 2
+        p_table: 2xT array of prices
+    """
+    # Initializing values
+    epsilon = calculate_epsilon(T)
+    i = 0
+    j = 1
+    t = 0
+    # Initializing Q-functions
+    k = len(price_grid)
+    q1 = np.zeros((k, k)) 
+    q2 = np.zeros((k, k)) 
+    # Initializing policies
+    policy_1 = np.ones((k, k)) / k
+    policy_2 = np.ones((k, k)) / k
+    # Initializing average policies
+    avg_policy1 = np.ones((k, k)) / k
+    avg_policy2 = np.ones((k, k)) / k
+    # Initializing N, a counter
+    N1 = np.zeros(k)
+    N2 = np.zeros(k)
+    # Initializing profits
+    p_table = np.zeros((2,T))
+    profits = np.zeros((2,T))
+    avg_profs1 = []
+    avg_profs2 = []
+
+    # Setting random price and state for t = 0
+    p_table[i,t] = np.random.choice(price_grid)
+    p_table[j,t] = np.random.choice(price_grid)
+    
+    t += 1
+    # Setting random price and state for t = 1
+    p_table[i,t] = np.random.choice(price_grid)
+    p_table[j,t] = np.random.choice(price_grid)
+    t += 1
+
+    q1list=[]
+    q2list=[]
+    
+    for t in range(t, T):
+        
+        #update Q
+        q1=q_func_wolf(q1, alpha, gamma, p_table, price_grid, i, j, t)
+
+        #update N
+        current_state_idx = np.where(price_grid == p_table[j,t-2])[0][0]
+        N1[current_state_idx] += 1
+        
+        #update policy 
+        policy_1, N1, avg_policy1, q1 = update_policy_WoLF(policy_1, price_grid, delta_l, delta_w, p_table, q1, t, N1, j, avg_policy1, k)
+        
+        #update prices
+        p_table[i,t] = select_price_WoLF(epsilon[t], price_grid, p_table[j,t-1], policy_1)
+        p_table[j,t]= p_table[j,t-1]
+        
+        #update profits
+        profits[i, t] = profit(p_table[i,t], p_table[j,t])
+        profits[j, t] = profit(p_table[j,t], p_table[i,t])
+        
+        # Compute profits
+        if t % 1000 == 0:
+            profitability = np.sum(profits[i, (t-1000):t])/1000
+            avg_profs1.append(profitability)
+            profitability = np.sum(profits[j, (t-1000):t])/1000
+            avg_profs2.append(profitability)
+        
+        
+        #switching players and their variables
+        i,j=j,i
+        q1,q2=q2,q1
+        policy_1,policy_2=policy_2,policy_1
+        avg_policy1,avg_policy2=avg_policy2,avg_policy1
+        N1,N2=N2,N1
+        if t>=499000:  
+            if t%2!=0:
+                q1list.append(q1)
+                q2list.append(q2)
+            else:
+                q1list.append(q2)
+                q2list.append(q1)
+         
+    return  p_table, q1list,q2list
+
+
+
+
+@njit
+def WoLF_PHC_asym_convergence(alpha, delta_l, delta_w, gamma, price_grid, T, mu):
+    """
+    args:
+        alpha: step-size parameter that regulates how quickly new information replaces old information
+        delta_l: learning rate when losing
+        delta_w: learning rate when winning
+        gamma: discount factor
+        price_grid: grid of prices
+        T: learning duration
+        mu: probability of observing wrong price
+    returns:
+        avg_profs1: list of average profits of player 1
+        avg_profs2: list of average profits of player 2
+        p_table: 2xT array of prices
+    """
+    # Initializing values
+    epsilon = calculate_epsilon(T)
+    i = 0
+    j = 1
+    t = 0
+    # Initializing Q-functions
+    k = len(price_grid)
+    q1 = np.zeros((k, k)) 
+    q2 = np.zeros((k, k)) 
+    # Initializing policies
+    policy_1 = np.ones((k, k)) / k
+    policy_2 = np.ones((k, k)) / k
+    # Initializing average policies
+    avg_policy1 = np.ones((k, k)) / k
+    avg_policy2 = np.ones((k, k)) / k
+    # Initializing N, a counter
+    N1 = np.zeros(k)
+    N2 = np.zeros(k)
+    # Initializing profits
+    p_table = np.zeros((2,T))
+    profits = np.zeros((2,T))
+    avg_profs1 = []
+    avg_profs2 = []
+
+    # Setting random price and state for t = 0
+    p_table[i,t] = np.random.choice(price_grid)
+    p_table[j,t] = np.random.choice(price_grid)
+    
+    t += 1
+    # Setting random price and state for t = 1
+    p_table[i,t] = np.random.choice(price_grid)
+    p_table[j,t] = np.random.choice(price_grid)
+    t += 1
+    q1list=[]
+    q2list=[]
+    
+    for t in range(t, T-1):
+        if t%2!=0:
+            #update Q
+            q1=q_func_wolf(q1, alpha, gamma, p_table, price_grid, i, j, t)
+
+            #update N
+            current_state_idx = np.where(price_grid == p_table[j,t-2])[0][0]
+            N1[current_state_idx] += 1
+            
+            #update policy 
+            policy_1, N1, avg_policy1, q1 = update_policy_WoLF(policy_1, price_grid, delta_l, delta_w, p_table, q1, t, N1, j, avg_policy1, k)
+            
+            #update prices
+            p_table[i,t] = select_price_WoLF(epsilon[t], price_grid, p_table[j,t-1], policy_1)
+            p_table[j,t]= p_table[j,t-1]
+            
+            #update profits
+            profits[i, t] = profit(p_table[i,t], p_table[j,t])
+            profits[j, t] = profit(p_table[j,t], p_table[i,t])
+        else:
+            #update Q
+            q2=q_func_wolf(q2, alpha, gamma, p_table, price_grid, j, i, t)
+
+            #update N
+            current_state_idx = np.where(price_grid == p_table[i,t-2])[0][0]
+            N2[current_state_idx] += 1
+            
+            #update policy 
+            policy_2, N2, avg_policy2, q2 = update_policy_WoLF(policy_2, price_grid, delta_l, delta_w, p_table, q2, t, N2, i, avg_policy2, k)
+            
+            #update prices
+            p_table[j,t] = select_price_WoLF_asym(epsilon[t], price_grid, p_table[i,t-1], policy_2,mu)
+            p_table[i,t]= p_table[i,t-1]
+            
+            #update profits
+            profits[j, t] = profit(p_table[j,t], p_table[i,t])
+            profits[i, t] = profit(p_table[i,t], p_table[j,t])
+            
+        # Compute profits
+        if t % 1000 == 0:
+            profitability = np.sum(profits[i, (t-1000):t])/1000
+            avg_profs1.append(profitability)
+            profitability = np.sum(profits[j, (t-1000):t])/1000
+            avg_profs2.append(profitability)
+        if t>=499000:  
+            q1list.append(q1)
+            q2list.append(q2)
+
+        #switching players and their variables
+    return p_table, q1list,q2list

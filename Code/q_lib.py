@@ -144,6 +144,7 @@ def Q_learner(alpha, gamma, T, price_grid):
         tmp=q1
         q1=q2
         q2=tmp
+        
     return p_table, avg_profs1, avg_profs2
 
 
@@ -496,3 +497,183 @@ def run_simFD(n, k):
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, counter)
 
     return new, avg_avg_profitabilities, avg_2period_prof1, avg_2period_prof2, avg_profits
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@njit
+def Q_learner_convergence(alpha, gamma, T, price_grid):
+    """
+    args:
+        alpha: step-size parameter
+        gamma: discount factor
+        T: learning duration
+        price_grid: price_grid
+    returns:
+        p_table: 2x500.000 array, with all prices set by player 0 and 1
+        avg_profs0: player 0 list of average profit for each 1000 period
+        avg_profs1: player 1 list of average profit for each 1000 period
+    """
+    # Initializing values
+    epsilon = calculate_epsilon(T)
+    i = 0
+    j = 1
+    t = 0
+    # Initializing Q-functions
+    p = len(price_grid)
+    q1 = np.zeros((p, p)) 
+    q2 = np.zeros((p, p)) 
+
+    p_table = np.zeros((2,T))
+    profits = np.zeros((2,T))
+    avg_profs1 = []
+    avg_profs2 = []
+    # setting prices for players in first 2 periods 
+    p_table[i, t] = np.random.choice(price_grid) # firm 1 sets price
+    t += 1
+    p_table[j, t] = np.random.choice(price_grid) # firm 2 sets price
+    p_table[i, t] = np.random.choice(price_grid) 
+    t += 1 # now t = 2
+
+
+    q1list=[]
+    q2list=[]
+    for t in range(t, T):
+        # updating q-tables 
+        p_table[i,t] = p_table[i,t-1]
+        p_idx = np.where(price_grid == p_table[i,t])[0][0]
+        s_next = p_table[j,t-1]
+        current_state_idx = np.where(price_grid == p_table[j,t-2])[0][0]
+        q1[p_idx, current_state_idx] = Q_func(p_idx, current_state_idx, i,j, t, alpha, gamma, p_table, q1, price_grid, s_next)
+        # setting price
+        p_table[i, t] = select_price(j, t, p_table, q1, price_grid, epsilon[t])
+        p_table[j, t] = p_table[j, t-1]
+
+        # Store profits for both firms
+        profits[i, t] = profit(p_table[i,t], p_table[j,t])
+        profits[j, t] = profit(p_table[j,t], p_table[i,t])
+
+        # compute avg profitability of last 1000 runs for both firms
+        if t % 1000 == 0:
+            profitability = np.sum(profits[i, (t-1000):t])/1000
+            avg_profs1.append(profitability)
+            profitability = np.sum(profits[j, (t-1000):t])/1000
+            avg_profs2.append(profitability)
+        
+        # changing agents
+        tmp = i
+        i = j
+        j = tmp
+        tmp=q1
+        q1=q2
+        q2=tmp
+        if t>=499000:
+            if t%2!=0:
+                q1list.append(q1)
+                q2list.append(q2)
+            else:
+                q1list.append(q2)
+                q2list.append(q1)  
+        
+    return p_table, q1list, q2list
+
+
+
+
+
+@njit
+def Q_asym_convergence(alpha, gamma, T, price_grid, mu):
+    """
+    args:
+        alpha: step-size parameter
+        gamma: discount factor
+        T: learning duration
+        price_grid: price_grid
+    returns:
+        p_table: 2x500.000 array, with all prices set by player 0 and 1
+        avg_profs0: player 0 list of average profit for each 1000 period
+        avg_profs1: player 1 list of average profit for each 1000 period
+    """
+    # Initializing values
+    epsilon = calculate_epsilon(T)
+    #i = 0
+    #j = 1
+    t = 0
+    # Initializing Q-functions
+    p = len(price_grid)
+    q1 = np.zeros((p, p)) 
+    q2 = np.zeros((p, p)) 
+
+    p_table = np.zeros((2,T))
+    profits = np.zeros((2,T))
+    avg_profs1 = []
+    avg_profs2 = []
+    # Setting prices for players in first 2 periods 
+    p_table[0, t] = np.random.choice(price_grid) # firm 1 sets price
+    t += 1
+    p_table[1, t] = np.random.choice(price_grid) # firm 2 sets price
+    p_table[0, t] = np.random.choice(price_grid) #p_table[i, t-1]
+    t += 1 # now t = 2
+    q1list=[]
+    q2list=[]
+    for t in range(t, T):
+        if t%2!=0:
+            p_table[0,t] = p_table[0,t-1]# Det er ligemeget om det er -1 eller -2 da den sætter prisen 2 gange i træk
+            p_idx = np.where(price_grid == p_table[0,t])[0][0]
+            s_next = p_table[1,t-1]
+            #s_next_idx = np.where(price_grid == s_next)[0][0]
+            current_state_idx = np.where(price_grid == p_table[1,t-2])[0][0]
+            q1[p_idx, current_state_idx] = Q_func(p_idx, current_state_idx, 0,1, t, alpha, gamma, p_table, q1, price_grid, s_next)
+
+            p_table[0, t] = select_price(1, t, p_table, q1, price_grid, epsilon[t])
+            p_table[1, t] = p_table[1, t-1]
+
+            # Store profits for both firms
+            profits[0, t] = profit(p_table[0,t], p_table[1,t])
+            profits[1, t] = profit(p_table[1,t], p_table[0,t])
+        else:
+            p_table[1,t] = p_table[1,t-1]# Det er ligemeget om det er -1 eller -2 da den sætter prisen 2 gange i træk
+            p_idx = np.where(price_grid == p_table[1,t])[0][0]
+            s_next = p_table[0,t-1]
+            #s_next_idx = np.where(price_grid == s_next)[0][0]
+            current_state_idx = np.where(price_grid == p_table[0,t-2])[0][0]
+            q1[p_idx, current_state_idx] = Q_func(p_idx, current_state_idx, 1,0, t, alpha, gamma, p_table, q1, price_grid, s_next)
+            
+            #questionable state for select price asym
+            p_table[1, t] = select_price_asym(0, t, p_table, q1, price_grid, epsilon[t], mu)
+            p_table[0, t] = p_table[0, t-1]
+
+            # Store profits for both firms
+            profits[1, t] = profit(p_table[1,t], p_table[0,t])
+            profits[0, t] = profit(p_table[0,t], p_table[1,t])
+        
+
+
+        # compute avg profitability of last 1000 runs for both firms
+        if t % 1000 == 0:
+            profitability = np.sum(profits[0, (t-1000):t])/1000
+            avg_profs1.append(profitability)
+            profitability = np.sum(profits[1, (t-1000):t])/1000
+            avg_profs2.append(profitability)
+            
+        tmp=q1
+        q1=q2
+        q2=tmp 
+        if t>=499000:  
+            if t%2!=0:
+                q1list.append(q1)
+                q2list.append(q2)
+            else:
+                q1list.append(q2)
+                q2list.append(q1)  
+    return p_table, q1list,q2list
