@@ -225,7 +225,7 @@ def run_sim_JAL_AM(n, k, show_progress=False):
 # ASYMMETRIC INFORMATION
 @njit
 def edge_or_focal_asym(edge, focal, p_table, mu, periods):
-    tolerance = mu * periods * 3
+    tolerance = mu * periods *0.5
     avg = p_table[0, -periods:]
     cycle = False
     deviations = 0
