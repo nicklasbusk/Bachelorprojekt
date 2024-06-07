@@ -181,6 +181,18 @@ def JAL_AM(alpha, gamma, T, price_grid):
     return p_table, avg_profs1, avg_profs2
 
 def run_sim_JALAM_single_run(alpha, gamma, T, price_grid):
+    """
+    args:
+        alpha: step-size parameter that regulates how quickly new information replaces old information
+        gamma: discount factor
+        T: learning duration
+        price_grid: grid of prices
+    returns:
+        avg_profs1: average profits for firm 1
+        avg_profs2: average profitst for firm 2
+        p_table: array containing all prices set by both firms
+        per_firm_proft: per firm profit
+    """
     p_table, avg_profs1, avg_profs2 = JAL_AM(alpha, gamma, T, price_grid)
     per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0) / 2
     return p_table, avg_profs1, avg_profs2, per_firm_profit
@@ -225,6 +237,18 @@ def run_sim_JAL_AM(n, k, show_progress=False):
 # ASYMMETRIC INFORMATION
 @njit
 def edge_or_focal_asym(edge, focal, p_table, mu, periods):
+    """
+    args
+        edge: counter for edgeworth cycles
+        focal: counter for focal pricing
+        p_table: price table from a simulation
+        mu: probablity of observing wrong price
+        periods: periods to check for price cycles
+    returns
+        edge:counter for edgeworth cycles
+        focal: counter for focal pricing
+        is_focal: boolean, focal pricing or not
+    """
     tolerance = mu * periods 
     avg = p_table[0, -periods:]
     cycle = False
@@ -342,7 +366,20 @@ def JAL_AM_asym(alpha, gamma, T, price_grid, mu):
 
 
 
-def run_sim_JALAM_asym_single_run(alpha, gamma, T, price_grid,mu):
+def run_sim_JALAM_asym_single_run(alpha, gamma, T, price_grid, mu):
+    """
+    args:
+        alpha: step-size parameter that regulates how quickly new information replaces old information
+        gamma: discount factor
+        T: learning duration
+        price_grid: grid of prices
+        mu: probability of observing wrong price
+    returns:
+        avg_profs1: average profits for firm 1
+        avg_profs2: average profitst for firm 2
+        p_table: array containing all prices set by both firms
+        per_firm_proft: per firm profit
+    """
     p_table, avg_profs1, avg_profs2 = JAL_AM_asym(alpha, gamma, T, price_grid,mu)
     per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0) / 2
     return p_table, avg_profs1, avg_profs2, per_firm_profit
@@ -386,31 +423,7 @@ def run_sim_JAL_AM_asym(n, k, mu,show_progress=False):
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
     return avg_avg_profitabilities, avg_prof_gain, edge, focal
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ################################CONVERGENCE#########################
-
-
-
-
-
-
-
-
-
-
 
 @njit
 def JAL_AM_convergence(alpha, gamma, T, price_grid):
@@ -485,14 +498,6 @@ def JAL_AM_convergence(alpha, gamma, T, price_grid):
                 q2list.append(q1)  
     
     return p_table, q1list,q2list
-
-
-
-
-
-
-
-
 
 
 @njit

@@ -262,22 +262,169 @@ def run_sim_wolf(n, k, show_progress=False):
     return avg_avg_profitabilities, avg_prof_gain, edge, focal
 
 
+
+@njit
+def WoLF_PHC_FD(alpha, delta_l, delta_w, gamma, price_grid, T):
+    """
+    args:
+        alpha: step-size parameter that regulates how quickly new information replaces old information
+        delta_l: learning rate when losing
+        delta_w: learning rate when winning
+        gamma: discount factor
+        price_grid: grid of prices
+        T: learning duration
+    returns:
+        profits: array containing all profits for both firms
+        avg_profs1: list of average profits of player 1
+        avg_profs2: list of average profits of player 2
+        p_table: 2xT array of prices
+    """
+    # Initializing values
+    epsilon = calculate_epsilon(T)
+    i = 0
+    j = 1
+    t = 0
+    # Initializing Q-functions
+    k = len(price_grid)
+    q1 = np.zeros((k, k)) 
+    q2 = np.zeros((k, k)) 
+    # Initializing policies
+    policy_1 = np.ones((k, k)) / k
+    policy_2 = np.ones((k, k)) / k
+    # Initializing average policies
+    avg_policy1 = np.ones((k, k)) / k
+    avg_policy2 = np.ones((k, k)) / k
+    # Initializing N, a counter
+    N1 = np.zeros(k)
+    N2 = np.zeros(k)
+    # Initializing profits
+    p_table = np.zeros((2,T))
+    profits = np.zeros((2,T))
+    avg_profs1 = []
+    avg_profs2 = []
+
+    # Setting random price and state for t = 0
+    p_table[i,t] = np.random.choice(price_grid)
+    p_table[j,t] = np.random.choice(price_grid)
+    
+    t += 1
+    # Setting random price and state for t = 1
+    p_table[i,t] = np.random.choice(price_grid)
+    p_table[j,t] = np.random.choice(price_grid)
+    t += 1
+    
+    for t in range(t, T-1):
+        
+        #update Q
+        q1=q_func_wolf(q1, alpha, gamma, p_table, price_grid, i, j, t)
+
+        #update N
+        current_state_idx = np.where(price_grid == p_table[j,t-2])[0][0]
+        N1[current_state_idx] += 1
+        
+        #update policy 
+        policy_1, N1, avg_policy1, q1 = update_policy_WoLF(policy_1, price_grid, delta_l, delta_w, p_table, q1, t, N1, j, avg_policy1, k)
+        
+        #update prices
+        if t==499950:
+            p_table[i,t] = price_grid[current_state_idx - 1]
+        else:
+            p_table[i, t] = select_price_WoLF(epsilon[t], price_grid, p_table[j,t-1], policy_1)
+        p_table[j, t] = p_table[j, t-1]
+        
+        #update profits
+        profits[i, t] = profit(p_table[i,t], p_table[j,t])
+        profits[j, t] = profit(p_table[j,t], p_table[i,t])
+        
+        # Compute profits
+        if t % 1000 == 0:
+            profitability = np.sum(profits[i, (t-1000):t])/1000
+            avg_profs1.append(profitability)
+            profitability = np.sum(profits[j, (t-1000):t])/1000
+            avg_profs2.append(profitability)
+        
+        
+        #switching players and their variables
+        i,j=j,i
+        q1,q2=q2,q1
+        policy_1,policy_2=policy_2,policy_1
+        avg_policy1,avg_policy2=avg_policy2,avg_policy1
+        N1,N2=N2,N1
+         
+    return profits, avg_profs1, avg_profs2, p_table
+
+
+def run_sim_wolf_FD(n, k):
+    """
+    args:
+        n: number of runs simulated
+        k: length of price action vector
+    returns:
+        new: 
+        avg_avg_profitabilities: average of average profits over n simulations
+    """
+    num_calcs=int(500000/1000-1)
+    summed_avg_profitabilities = np.zeros(num_calcs)
+    # initialising ???
+    A = np.zeros([0,500000])
+    B = np.zeros([0,500000])
+    C=np.zeros([0,249999])
+    D=np.zeros([0,249999])
+    counter = 0
+    avg_2period_prof1 = []
+    avg_2period_prof2 = []
+    cap=1
+    #for n in range(0, runs):
+    while cap <=n:   #while cap<=177:
+        profits, avg_profs1, avg_profs2, p_table = WoLF_PHC_FD(0.3, 0.6, 0.2, 0.95, np.linspace(0,1,k), 500000)
+        #check to see if the variance of the last 1000 periods is low
+        var1 = np.var(p_table[0, 498999:499999])
+        var2 = np.var(p_table[1, 498999:499999])
+        var = np.mean([var1, var2])
+        #if variance is low, we use the average profitabilities, as pricecyles should not occur when for forced deviation
+        if var < 0.001:
+            per_firm_profit = avg_profs1 #np.sum([avg_profs1, avg_profs2], axis=0)/2
+            summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
+            A = np.vstack([A,p_table[0,:]])
+            B = np.vstack([B,p_table[1,:]])
+            counter += 1
+            avg_2period_prof1 = []
+            avg_2period_prof2 = []
+            prof1 = profits[0,:]
+            prof2 = profits[1,:]
+            for i in range(1,len(prof1)-1, 2):
+                avg_2period_prof1.append(prof1[i] + prof1[i+1])
+                avg_2period_prof2.append(prof2[i] + prof2[i+1])
+            C = np.vstack([C,avg_2period_prof1])
+            D = np.vstack([D,avg_2period_prof2])
+            cap+=1
+
+    new = np.zeros([2, 500000])  # Initialize new list with zeros
+    for i in range(499998):
+        for j in range(counter):
+            new[0,i] += A[j, i]
+            new[1,i] += B[j, i]
+        new[0,i] /= counter  
+        new[1,i]/= counter
+    
+    
+    avg_profits=np.zeros([2,250000])
+
+    for i in range(249999):
+        for j in range(cap-1):
+            avg_profits[0,i] += C[j, i]
+            avg_profits[1,i] += D[j, i]
+        avg_profits[0,i] /= cap  
+        avg_profits[1,i]/= cap
+
+    avg_avg_profitabilities = np.divide(summed_avg_profitabilities, counter)
+
+    return new, avg_avg_profitabilities, avg_2period_prof1, avg_2period_prof2, avg_profits
+
 # ASYMMETRIC INFORMATION
 
 @njit
 def edge_or_focal_asym(edge, focal, p_table, mu, periods):
-    """
-    args
-        edge: counter for edgeworth cycles
-        focal: counter for focal pricing
-        p_table: price table from a simulation
-        mu: probablity of observing wrong price
-        periods: periods to check for price cycles
-    returns
-        edge:counter for edgeworth cycles
-        focal: counter for focal pricing
-        is_focal: boolean, focal pricing or not
-    """
     tolerance = mu * periods
     avg = p_table[0, -periods:]
     cycle = False
@@ -305,7 +452,6 @@ def select_price_WoLF_asym(epsilon, price_grid, current_state, policy, mu):
         price_grid: grid of prices
         current_state: current state of player
         policy: policy of player
-        mu: probablity of observing wrong price
     returns:
         either a random price or price determined by policy
     """
@@ -424,20 +570,6 @@ def WoLF_PHC_asym(alpha, delta_l, delta_w, gamma, price_grid, T, mu):
 
 
 def run_sim_wolf_asym_single_run(alpha, delta_win, delta_loss, gamma, price_grid, T, mu):
-    """
-    args:
-        alpha: step-size parameter that regulates how quickly new information replaces old information
-        delta_win: learning rate when winning
-        delta_loss: learning rate when losing
-        gamma: discount factor
-        price_grid: grid of prices
-        T: learning duration
-    returns:
-        avg_profs1: average profits for firm 1
-        avg_profs2: average profitst for firm 2
-        p_table: array containing all prices set by both firms
-        per_firm_proft: per firm profit
-    """
     avg_profs1, avg_profs2, p_table = WoLF_PHC_asym(alpha, delta_win, delta_loss, gamma, price_grid, T, mu)
     per_firm_profit = np.sum([avg_profs1, avg_profs2], axis=0) / 2
     return avg_profs1, avg_profs2, p_table, per_firm_profit
@@ -447,7 +579,6 @@ def run_sim_wolf_asym(n, k,mu, show_progress=False):
     args:
         n: number of runs simulated
         k: length of price action vector
-        show_progress: progress bar or not
     returns:
         avg_avg_profitabilities: average of average profits over n simulations
         avg_prof_gain: list containing average profit gains of runs
@@ -477,7 +608,24 @@ def run_sim_wolf_asym(n, k,mu, show_progress=False):
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
     return avg_avg_profitabilities, avg_prof_gain, edge, focal
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ###################CONVERGENCE##############################
+
+
+
 
 @njit
 def WoLF_PHC_convergence(alpha, delta_l, delta_w, gamma, price_grid, T):
@@ -575,6 +723,8 @@ def WoLF_PHC_convergence(alpha, delta_l, delta_w, gamma, price_grid, T):
                 q2list.append(q1)
          
     return  p_table, q1list,q2list
+
+
 
 
 @njit

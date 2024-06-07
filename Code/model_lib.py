@@ -14,9 +14,7 @@ def calculate_epsilon(T):
     returns
         epsilon_values: list of T epsilon values, epsilon is a value between 0 and 1 and decreases over time t
     """
-
     epsilon_values = []
-    
     for i in range(T):
         theta = -((1/1000000) ** (1/T)) + 1 # theta being a decay parameter
         epsilon = (1 - theta) ** i 
