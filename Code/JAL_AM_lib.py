@@ -419,9 +419,10 @@ def run_sim_JAL_AM_asym(n, k, mu,show_progress=False):
             summed_profit2 = np.sum([summed_profit2, avg_profs2], axis=0)
             avg_prof_gain[i] = per_firm_profit[498] / 0.125
             edge, focal, isfocal = edge_or_focal_asym(edge, focal, p_table,mu,50)
-            
+    avg_summed_profit1 = np.divide(summed_profit1, n)
+    avg_summed_profit2 = np.divide(summed_profit2, n)        
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
-    return avg_avg_profitabilities, avg_prof_gain, edge, focal
+    return avg_avg_profitabilities, avg_prof_gain, edge, focal, avg_summed_profit1, avg_summed_profit2
 
 ################################CONVERGENCE#########################
 

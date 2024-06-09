@@ -192,7 +192,7 @@ def run_sim_Q(n, k, show_progress=False):
             iterator = tqdm(enumerate(as_completed(futures)), total=n, desc='Q-learning')
         else:
             iterator = enumerate(as_completed(futures))
-        
+            
         for i, future in iterator:
             p_table, avg_profs1, avg_profs2, per_firm_profit = future.result()
             summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
@@ -202,7 +202,7 @@ def run_sim_Q(n, k, show_progress=False):
             edge, focal, p_m = edge_or_focal(edge, focal, p_table)
             
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
-    return avg_avg_profitabilities, avg_prof_gain, edge, focal
+    return avg_avg_profitabilities, avg_prof_gain, edge, focal, summed_profit1, summed_profit2
 
 # ASYMETRIC INFORMATION
 @njit
@@ -406,9 +406,11 @@ def run_sim_Q_Asym(n, k,mu, show_progress=False):
             summed_profit2 = np.sum([summed_profit2, avg_profs2], axis=0)
             avg_prof_gain[i] = per_firm_profit[498] / 0.125
             edge, focal, p_m = edge_or_focal_asym(edge, focal, p_table,mu,50)
-            
+
+    avg_summed_profit1 = np.divide(summed_profit1, n)
+    avg_summed_profit2 = np.divide(summed_profit2, n)
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
-    return avg_avg_profitabilities, avg_prof_gain, edge, focal
+    return avg_avg_profitabilities, avg_prof_gain, edge, focal, avg_summed_profit1, avg_summed_profit2
 
 
 
