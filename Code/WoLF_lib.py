@@ -456,6 +456,8 @@ def run_sim_wolf_asym(n, k,mu, show_progress=False):
     """
     num_calcs = int(500000 / 1000 - 1)  # size of avg. profits 
     summed_avg_profitabilities = np.zeros(num_calcs)
+    summed_profit1 = np.zeros(num_calcs)
+    summed_profit2 = np.zeros(num_calcs)
     avg_prof_gain = np.zeros(n)
     focal = 0
     edge = 0
@@ -472,10 +474,13 @@ def run_sim_wolf_asym(n, k,mu, show_progress=False):
             avg_profs1, avg_profs2, p_table, per_firm_profit = future.result()
             avg_prof_gain[i] = per_firm_profit[498] / 0.125
             summed_avg_profitabilities = np.sum([summed_avg_profitabilities, per_firm_profit], axis=0)
+            summed_profit1 = np.sum([summed_profit1, avg_profs1], axis=0)
+            summed_profit2 = np.sum([summed_profit2, avg_profs2], axis=0)
             edge, focal, p_mc = edge_or_focal_asym(edge, focal, p_table,mu,50)
-            
+    avg_summed_profit1 = np.divide(summed_profit1, n)
+    avg_summed_profit2 = np.divide(summed_profit2, n)       
     avg_avg_profitabilities = np.divide(summed_avg_profitabilities, n)
-    return avg_avg_profitabilities, avg_prof_gain, edge, focal
+    return avg_avg_profitabilities, avg_prof_gain, edge, focal, avg_summed_profit1, avg_summed_profit2
 
 ###################CONVERGENCE##############################
 
