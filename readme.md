@@ -12,5 +12,5 @@ All code for this project is found in the `code` directory. The code that produc
 To run the Jupyter Notebook (`.ipynb`) files, you can use the Jupyter Notebook application from a distribution like [Anaconda](https://www.anaconda.com/).
 
 
-Authors of this Bachelor thesis are
-Mikkel Foss Engelsted and Nicklas Busk Jensen
+
+**Authors:** Mikkel Foss Engelsted and Nicklas Busk Jensen
